@@ -51,8 +51,9 @@ main{flex:1;min-height:0;width:100%;display:flex;flex-direction:row;align-items:
 #side section{display:flex;flex-direction:column;gap:8px}
 .muted{color:var(--muted);font-size:13px;margin:0}
 .warn{background:var(--warnbg);color:var(--warn);padding:8px;border-radius:8px;font-size:13px;margin:0}
-.zrow{display:flex;align-items:center;gap:6px;padding:4px;border-radius:8px;border:1px solid transparent}
+.zrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px;border-radius:8px;border:1px solid transparent}
 .zrow.on{border-color:var(--accent);background:#f0f6ff}
+.zsel{flex-basis:100%;padding:4px 6px;font-size:13px}
 .zrow input{flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;font:inherit}
 .chip{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 5px;border-radius:13px;color:#fff;font-weight:700;font-size:12px;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
 .cnt{font-size:13px;color:var(--muted);min-width:18px;text-align:right}
@@ -74,10 +75,18 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 #cropImg{display:block;max-width:100%;max-height:55vh;width:auto;height:auto;pointer-events:none;margin:0 auto}
 #cropRect{position:absolute;border:2px dashed #facc15;background:rgba(250,204,21,.18);pointer-events:none}
 #mapAddr{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;width:100%}
-.legend{display:flex;flex-direction:column;gap:6px;margin-top:10px;font-size:13px}
-.legend h4{margin:6px 0 0;font-size:13px}
-.legend .row2{display:flex;align-items:center;gap:8px}
-.legend .code{display:inline-block;min-width:34px;font-weight:700}
+.legend{display:grid;grid-template-columns:1fr 1.5fr;gap:12px;margin-top:6px;font-size:10px;break-inside:avoid;page-break-inside:avoid;text-align:left}
+.legend h4{margin:0 0 4px;font-size:11px}
+.lg-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+.lg-eq{display:flex;align-items:flex-start;gap:6px;margin-bottom:4px}
+.lg-note{color:#555;font-size:9px}
+.ex{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;padding:0 4px;border-radius:11px;color:#fff;font-weight:700;font-size:10px;border:2px solid #fff;box-shadow:0 0 0 1px #bbb;flex:none;background:#1f6feb}
+.ex.eq{border-radius:5px;min-width:30px}
+.ex.eq-controller{background:#111827}
+.ex.eq-shutoff{background:#0e7490}
+.ex.eq-valve{background:#fff;color:#111;border:2px solid #111;border-radius:50%}
+.ex.eq-winterize{background:#7c3aed}
+.ex.unassigned{background:var(--red)}
 /* printing */
 #printArea{display:none}
 .sheet .phead{margin-bottom:8px}
@@ -85,7 +94,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 .psub{font-size:12px;color:#555}
 .pwrap{text-align:center;margin:6px 0}
 .pstage{display:inline-block;position:relative;max-width:100%}
-.pstage img{display:block;max-height:6.2in;max-width:100%;width:auto;height:auto}
+.pstage img{display:block;max-height:5.8in;max-width:100%;width:auto;height:auto}
 .pstage .layer{position:absolute;inset:0}
 .ptable{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
 .ptable th,.ptable td{border-bottom:1px solid #ccc;padding:3px 4px;text-align:left;vertical-align:top}
@@ -107,7 +116,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.5</small>
+    <small>Tap anywhere to continue · v1.6</small>
   </div>
 </div>
 
@@ -150,7 +159,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 
 <header>
   <div class="topbar">
-    <span class="title">Sprinkler Map<span class="ver">v1.5</span></span>
+    <span class="title">Sprinkler Map<span class="ver">v1.6</span></span>
     <button id="bUndo" disabled>Undo</button>
     <button id="bNew">New</button>
     <button id="bOpen">Open</button>
@@ -340,6 +349,7 @@ function zoneRowHTML(z){
       <input data-zname="${z.id}" value="${esc(z.name)}" placeholder="Name (optional)" aria-label="Zone ${z.num} name">
       <span class="cnt">${n}</span>
       <button class="danger sm" data-zdel="${z.id}" aria-label="Delete zone ${z.num}">✕</button>
+      <select class="zsel" data-zctrl="${z.id}" aria-label="Controller for zone ${z.num}"><option value="">No controller</option>${controllers().map(c=>`<option value="${c.id}"${c.id===z.ctrl?' selected':''}>${esc(c.code)} · ${esc(c.name)}</option>`).join('')}</select>
     </div>`;
   }
 }
@@ -402,7 +412,7 @@ function zonesSide(){
   if(!ctrls.length){
     html += group('Zones', null, orphans, 'Add a controller on the Equipment tab. Zones then group under it. Tap a zone to make it active; names are optional.');
   } else {
-    html += ctrls.map(c=>group(`${c.code} · ${c.name}`, c.id, doc.zones.filter(z=>z.ctrl===c.id), 'Tap a zone to make it active. Names are optional.')).join('');
+    html += ctrls.map(c=>group(`${c.code} · ${c.name}`, c.id, doc.zones.filter(z=>z.ctrl===c.id), 'Tap a zone to make it active. Use a zone\'s Controller menu to move it and its heads to another controller.')).join('');
     if(orphans.length) html += group('No controller', null, orphans, 'These zones are not on a controller yet.');
   }
   return html;
@@ -537,6 +547,16 @@ function addZone(ctrlId){
   touch(); renderAll();
 }
 
+// move a zone (and, since heads point at their zone, its heads) to another controller
+function moveZone(zid, ctrlId){
+  const z = zoneById(zid);
+  if(!z) return;
+  checkpoint();
+  z.ctrl = ctrlId;
+  if(doc.numbering !== 'cont') renumberZones();
+  touch(); renderAll();
+}
+
 // renumber all zones when the numbering option changes
 function renumberZones(){
   const ctrls = controllers();
@@ -667,9 +687,15 @@ function afterLoad(){
 /* ---------- printing ---------- */
 function overviewSheetHTML(s, date, img){
   const unassigned = doc.heads.filter(h=>!h.zone).length;
-  const zoneItems = doc.zones.map(z=>`<div class="row2"><span class="chip" style="background:${z.color}">${esc(zoneTag(z))}</span><span>${esc(zoneLabel(z))}</span></div>`).join('')
-    + (unassigned ? `<div class="row2"><span class="chip" style="background:#dc2626">?</span><span>Needs assignment (${unassigned} head${unassigned===1?'':'s'})</span></div>` : '');
-  const eqItems = doc.equipment.map(q=>`<div class="row2"><span class="code">${esc(q.code)}</span><span>${esc(KIND[q.kind].name)}${q.name && q.name!==KIND[q.kind].name ? ' – '+esc(q.name) : ''}</span></div>`).join('');
+  // legend shows examples only: one head for a single controller, two (1-C1, 1-C2) when there are more
+  const ctrls = controllers();
+  const colorOf = c => { const z = doc.zones.find(z=>z.ctrl===c.id); return z ? z.color : '#1f6feb'; };
+  const headExamples = ctrls.length > 1
+    ? [ctrls[0], ctrls[1]].map(c=>`<span class="ex" style="background:${colorOf(c)}">1-${esc(c.code)}</span>`).join('')
+    : `<span class="ex" style="background:${doc.zones[0] ? doc.zones[0].color : '#1f6feb'}">1</span>`;
+  const zoneItems = `<div class="lg-row">${headExamples}<span>Zone number${ctrls.length>1 ? ' and controller' : ''}</span></div>`
+    + (unassigned ? `<div class="lg-row"><span class="ex unassigned">?</span><span>Needs a zone</span></div>` : '');
+  const eqItems = doc.equipment.map(q=>`<div class="lg-eq"><span class="ex eq eq-${q.kind}">${esc(q.code)}</span><div><b>${esc(KIND[q.kind].name)}</b>${q.name && q.name!==KIND[q.kind].name ? ' – '+esc(q.name) : ''}${q.notes ? `<div class="lg-note">${esc(q.notes)}</div>` : ''}</div></div>`).join('');
   return `<section class="sheet">
     <div class="phead">
       <div class="ptitle">${esc(doc.name || 'Sprinkler Map')}</div>
@@ -677,9 +703,14 @@ function overviewSheetHTML(s, date, img){
     </div>
     <div class="pwrap"><div class="pstage"><img src="${img}" alt=""><div class="layer">${markersHTML(undefined, true)}</div></div></div>
     <div class="legend">
-      <h4>Zones</h4>
-      ${zoneItems || '<div>No zones</div>'}
-      ${eqItems ? '<h4>Equipment</h4>' + eqItems : ''}
+      <div class="lg-col">
+        <h4>Heads</h4>
+        ${zoneItems}
+      </div>
+      <div class="lg-col">
+        <h4>Equipment</h4>
+        ${eqItems || '<div>None marked</div>'}
+      </div>
     </div>
     <p class="disc">For reference only. Check with a licensed irrigation contractor or qualified professional before sprinkler, plumbing, or winterization work.</p>
   </section>`;
@@ -927,6 +958,7 @@ $('#side').addEventListener('input', e=>{
 });
 $('#side').addEventListener('change', e=>{
   const t = e.target;
+  if(t.dataset.zctrl !== undefined){ moveZone(t.dataset.zctrl, t.value || null); return; }
   if(t.dataset.activezone !== undefined){ activeZone = t.value || null; renderAll(); return; }
   if(t.dataset.hzone){
     const h = findItem(t.dataset.hzone);
