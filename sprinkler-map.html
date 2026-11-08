@@ -8,10 +8,12 @@
 :root{--bg:#f4f6f8;--ink:#1f2933;--muted:#667085;--line:#d0d5dd;--accent:#1f6feb;--red:#dc2626;--warn:#92400e;--warnbg:#fef3c7}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
+html,body{overscroll-behavior:none}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
 header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:max(10px,env(safe-area-inset-top)) 12px 8px}
 .topbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .title{font-weight:700;font-size:18px;margin-right:auto}
+.ver{font-size:12px;font-weight:400;color:var(--muted);margin-left:4px}
 .toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
 button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
 button:disabled{opacity:.45;cursor:default}
@@ -61,6 +63,10 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 #splash h1{margin:0 0 8px;font-size:32px}
 #splash p{margin:0 0 24px;font-size:18px}
 #splash small{opacity:.8}
+#cropBox{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;max-height:55vh;overflow:hidden;border:1px solid var(--line);border-radius:8px}
+#cropImg{display:block;max-width:100%;max-height:55vh;width:auto;height:auto;pointer-events:none;margin:0 auto}
+#cropRect{position:absolute;border:2px dashed #facc15;background:rgba(250,204,21,.18);pointer-events:none}
+#mapAddr{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;width:100%}
 /* printing */
 #printArea{display:none}
 .sheet .phead{margin-bottom:8px}
@@ -89,7 +95,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1</small>
+    <small>Tap anywhere to continue · v1.1</small>
   </div>
 </div>
 
@@ -98,16 +104,30 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
     <h2>Choose your map picture</h2>
     <p>Use a screenshot of your yard from Google Maps or Apple Maps (satellite view works best), or upload your own picture. This app cannot pull the map itself.</p>
     <p class="warn">Privacy: this app does not store your address. Your picture may still show a house number or street label, and the picture is saved inside your file. Crop it first if you don't want that.</p>
+    <p id="setupSteps" class="muted">Choose how to get your yard picture.</p>
     <button class="primary big" data-src="upload">Upload my own picture</button>
-    <button class="big" data-src="google">Use a Google Maps screenshot</button>
-    <button class="big" data-src="apple">Use an Apple Maps screenshot</button>
+    <input id="mapAddr" type="text" placeholder="Optional: your address, used only to open the map (not saved)" autocomplete="off">
+    <button class="big" data-src="google">Open Google Maps</button>
+    <button class="big" data-src="apple">Open Apple Maps</button>
+    <button id="btnPick" class="primary big" hidden>Choose screenshot</button>
     <button id="setupCancel" class="big">Cancel</button>
+  </div>
+</div>
+
+<div id="crop" class="overlay" hidden>
+  <div class="card">
+    <h2>Crop to your yard</h2>
+    <p class="muted">Drag a box around your property. Cropping removes the address bar, street labels, and most of the surroundings from the saved picture.</p>
+    <div id="cropBox"><img id="cropImg" alt=""><div id="cropRect" hidden></div></div>
+    <button id="cropUse" class="primary big">Use this crop</button>
+    <button id="cropFull" class="big">Use full picture</button>
+    <button id="cropBack" class="big">Back</button>
   </div>
 </div>
 
 <header>
   <div class="topbar">
-    <span class="title">Sprinkler Map</span>
+    <span class="title">Sprinkler Map<span class="ver">v1.1</span></span>
     <button id="bNew">New</button>
     <button id="bOpen">Open</button>
     <button id="bSave" class="primary">Save</button>
@@ -386,6 +406,8 @@ function clearAutosave(){ try{ localStorage.removeItem(KEY); }catch(e){} autoNot
 
 function showSetup(){
   $('#setupCancel').hidden = !doc.image;
+  $('#btnPick').hidden = true;
+  $('#setupSteps').textContent = 'Choose how to get your yard picture.';
   $('#setup').hidden = false;
 }
 
@@ -500,28 +522,31 @@ $('#modes').addEventListener('click', e=>{
 
 // setup / picture
 document.querySelectorAll('[data-src]').forEach(b=>{
-  b.onclick = ()=>{ pendingSource = b.dataset.src; $('#fileImg').click(); };
+  b.onclick = ()=>{
+    const src = b.dataset.src;
+    pendingSource = src;
+    if(src==='upload'){ $('#fileImg').click(); return; }
+    const addr = $('#mapAddr').value.trim();
+    const q = encodeURIComponent(addr);
+    const isGoogle = src==='google';
+    let url;
+    if(isGoogle) url = addr ? `https://www.google.com/maps/search/?api=1&query=${q}` : 'https://www.google.com/maps';
+    else url = addr ? `https://maps.apple.com/?q=${q}&t=k` : 'https://maps.apple.com/?t=k';
+    window.open(url, '_blank');
+    $('#mapAddr').value = '';
+    const name = isGoogle ? 'Google Maps' : 'Apple Maps';
+    const satStep = isGoogle ? 'switch to Satellite from the layers menu, ' : '';
+    $('#setupSteps').textContent = `${name} opened in a new tab. Find your home, ${satStep}and take a screenshot. On iPad, press the top button and volume up together. Then come back here and tap Choose screenshot.`;
+    $('#btnPick').hidden = false;
+  };
 });
+$('#btnPick').onclick = ()=>$('#fileImg').click();
 $('#setupCancel').onclick = ()=>{ $('#setup').hidden = true; };
 $('#fileImg').addEventListener('change', e=>{
   const f = e.target.files[0]; e.target.value = '';
   if(!f) return;
   const r = new FileReader();
-  r.onload = ()=>{
-    const im = new Image();
-    im.onload = ()=>{
-      doc.image = r.result;
-      doc.mapW = im.naturalWidth; doc.mapH = im.naturalHeight;
-      doc.mapSource = pendingSource;
-      doc.scale = null;
-      touch();
-      $('#setup').hidden = true;
-      mode = 'select';
-      renderAll();
-      flash('Picture loaded. Your picture may show your address. This app does not store it, but the picture is saved in your file. Next, set the scale.');
-    };
-    im.src = r.result;
-  };
+  r.onload = ()=>{ openCrop(r.result, pendingSource); };
   r.readAsDataURL(f);
 });
 
@@ -602,6 +627,84 @@ $('#side').addEventListener('change', e=>{
   else if(t.dataset.htype){ const h = findItem(t.dataset.htype); if(h){ h.type = t.value; touch(); } }
   else if(t.name==='pm'){ printMode = t.value; }
 });
+
+// block pull-down-to-refresh at the top of the page so unsaved work isn't lost
+let touchStartY = 0;
+document.addEventListener('touchstart', e=>{ touchStartY = e.touches[0].clientY; }, {passive:true});
+document.addEventListener('touchmove', e=>{
+  const dy = e.touches[0].clientY - touchStartY;
+  const sw = $('#stageWrap');
+  const scrollingMap = sw && sw.contains(e.target) && sw.scrollTop > 0;
+  if(window.scrollY <= 0 && dy > 0 && !scrollingMap) e.preventDefault();
+}, {passive:false});
+
+// crop step: draw a box around the property before saving the picture
+let cropSrc = null, cropSource = null, cropSel = null, cropDragging = false;
+function openCrop(dataURL, source){
+  cropSrc = dataURL; cropSource = source; cropSel = null;
+  $('#cropImg').src = dataURL;
+  drawCropRect();
+  $('#setup').hidden = true;
+  $('#crop').hidden = false;
+}
+function cropPoint(e){
+  const r = $('#cropImg').getBoundingClientRect();
+  return {x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height)};
+}
+function drawCropRect(){
+  const el = $('#cropRect');
+  if(!cropSel){ el.hidden = true; return; }
+  el.hidden = false;
+  const x = Math.min(cropSel.x0, cropSel.x1), y = Math.min(cropSel.y0, cropSel.y1);
+  el.style.left = (x*100)+'%'; el.style.top = (y*100)+'%';
+  el.style.width = (Math.abs(cropSel.x1-cropSel.x0)*100)+'%';
+  el.style.height = (Math.abs(cropSel.y1-cropSel.y0)*100)+'%';
+}
+$('#cropBox').addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  const p = cropPoint(e);
+  cropDragging = true;
+  cropSel = {x0:p.x, y0:p.y, x1:p.x, y1:p.y};
+  drawCropRect();
+  try{ $('#cropBox').setPointerCapture(e.pointerId); }catch(_){}
+});
+$('#cropBox').addEventListener('pointermove', e=>{
+  if(!cropDragging) return;
+  const p = cropPoint(e);
+  cropSel.x1 = p.x; cropSel.y1 = p.y;
+  drawCropRect();
+});
+function endCropDrag(){ cropDragging = false; }
+$('#cropBox').addEventListener('pointerup', endCropDrag);
+$('#cropBox').addEventListener('pointercancel', endCropDrag);
+function applyCrop(useCrop){
+  const img = $('#cropImg');
+  const W = img.naturalWidth, H = img.naturalHeight;
+  let sx = 0, sy = 0, sw = W, sh = H;
+  if(useCrop){
+    if(!cropSel){ alert('Drag a box around your property first, or tap Use full picture.'); return; }
+    const x0 = Math.min(cropSel.x0, cropSel.x1), x1 = Math.max(cropSel.x0, cropSel.x1);
+    const y0 = Math.min(cropSel.y0, cropSel.y1), y1 = Math.max(cropSel.y0, cropSel.y1);
+    if((x1-x0) < 0.05 || (y1-y0) < 0.05){ alert('That box is too small. Drag a larger box.'); return; }
+    sx = Math.round(x0*W); sy = Math.round(y0*H);
+    sw = Math.round((x1-x0)*W); sh = Math.round((y1-y0)*H);
+  }
+  const c = document.createElement('canvas');
+  c.width = sw; c.height = sh;
+  c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+  doc.image = c.toDataURL('image/jpeg', 0.9);
+  doc.mapW = sw; doc.mapH = sh;
+  doc.mapSource = cropSource;
+  doc.scale = null;
+  touch();
+  $('#crop').hidden = true;
+  mode = 'select';
+  renderAll();
+  flash('Picture saved. Next, set the scale.');
+}
+$('#cropFull').onclick = ()=>applyCrop(false);
+$('#cropUse').onclick = ()=>applyCrop(true);
+$('#cropBack').onclick = ()=>{ $('#crop').hidden = true; $('#setup').hidden = false; };
 
 // boot
 doc = newDoc();
