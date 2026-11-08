@@ -10,7 +10,7 @@ h1{font-size:20px;margin:0 0 6px}
 h2{font-size:16px;margin:0 0 6px}
 p.note{font-size:13px;color:#555;margin:6px 0}
 form{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-input[type=text]{flex:1;min-width:220px;padding:8px;font-size:16px;border:1px solid #bbb;border-radius:6px}
+input[type=text],input[type=password]{flex:1;min-width:220px;padding:8px;font-size:16px;border:1px solid #bbb;border-radius:6px}
 button{padding:8px 14px;font-size:15px;border:1px solid #888;border-radius:6px;background:#fff;cursor:pointer}
 button.primary{background:#111;color:#fff;border-color:#111}
 button:disabled{opacity:.4;cursor:default}
@@ -27,8 +27,13 @@ button:disabled{opacity:.4;cursor:default}
 </head>
 <body>
 <h1>Map source test (free options)</h1>
-<p class="note">Type an address. It is sent once to OpenStreetMap's search service to find coordinates. The address is not saved by this page. Draw a box on either picture, then press Crop box.</p>
-<form id="f"><input type="text" id="addr" placeholder="123 Main St, Town, ST" autocomplete="off"><button class="primary" type="submit">Find</button></form>
+<p class="note">Type an address. It is sent once to OpenStreetMap's search service to find coordinates. The address is not saved by this page. Draw a box on any picture, then press Crop box.</p>
+<form id="f">
+  <input type="text" id="addr" placeholder="123 Main St, Town, ST" autocomplete="off">
+  <input type="password" id="azkey" placeholder="Azure Maps key (only for the Azure panel)" autocomplete="off">
+  <button class="primary" type="submit">Find</button>
+</form>
+<p class="note">The Azure key is used only for this page's requests and is not saved. The key is visible to anyone who opens this page, so use a key you can delete afterward.</p>
 <div class="status" id="gstat"></div>
 <div class="grid">
   <div>
@@ -45,13 +50,35 @@ button:disabled{opacity:.4;cursor:default}
     <div class="status" id="naipStat"></div>
     <canvas class="out" id="naipOut"></canvas>
   </div>
+  <div>
+    <h2>Esri World Imagery satellite</h2>
+    <div class="stage" id="esriStage"></div>
+    <div class="row" style="margin-top:6px"><button id="esriCrop" disabled>Crop box</button><button id="esriSave" disabled>Save cropped picture</button></div>
+    <div class="status" id="esriStat"></div>
+    <canvas class="out" id="esriOut"></canvas>
+  </div>
+  <div>
+    <h2>Azure Maps satellite (needs key)</h2>
+    <div class="stage" id="azureStage"></div>
+    <div class="row" style="margin-top:6px"><button id="azureCrop" disabled>Crop box</button><button id="azureSave" disabled>Save cropped picture</button></div>
+    <div class="status" id="azureStat"></div>
+    <canvas class="out" id="azureOut"></canvas>
+  </div>
 </div>
 <script>
 const R = 6378137;
-const sources = {
-  osm:  { stage: document.getElementById('osmStage'),  stat: document.getElementById('osmStat'),  crop: document.getElementById('osmCrop'),  save: document.getElementById('osmSave'),  out: document.getElementById('osmOut'),  sel: null },
-  naip: { stage: document.getElementById('naipStage'), stat: document.getElementById('naipStat'), crop: document.getElementById('naipCrop'), save: document.getElementById('naipSave'), out: document.getElementById('naipOut'), sel: null }
-};
+const KEYS = ['osm', 'naip', 'esri', 'azure'];
+const sources = {};
+for(const k of KEYS){
+  sources[k] = {
+    stage: document.getElementById(k + 'Stage'),
+    stat: document.getElementById(k + 'Stat'),
+    crop: document.getElementById(k + 'Crop'),
+    save: document.getElementById(k + 'Save'),
+    out: document.getElementById(k + 'Out'),
+    sel: null
+  };
+}
 
 // load an image; try with CORS first so the canvas can be saved, then without it
 function loadImg(url){
@@ -71,7 +98,8 @@ function mercator(lat, lon){
   return { x: R * lon * Math.PI / 180, y: R * Math.log(Math.tan(Math.PI/4 + lat * Math.PI / 360)) };
 }
 
-async function buildOSM(lat, lon){
+// build a 768 px picture from a 3 by 3 grid of map tiles around the address (zoom 18)
+async function buildTiles(lat, lon, urlFor, label){
   const z = 18, n = Math.pow(2, z);
   const px = (lon + 180) / 360 * n * 256;
   const latR = lat * Math.PI / 180;
@@ -83,11 +111,10 @@ async function buildOSM(lat, lon){
   ctx.fillStyle = '#ddd'; ctx.fillRect(0, 0, 768, 768);
   const jobs = [];
   for(let i = 0; i < 3; i++) for(let j = 0; j < 3; j++){
-    const url = `https://tile.openstreetmap.org/${z}/${tx0 + i}/${ty0 + j}.png`;
-    jobs.push(loadImg(url).then(r => { if(r) ctx.drawImage(r.img, i * 256, j * 256, 256, 256); return r; }));
+    jobs.push(loadImg(urlFor(z, tx0 + i, ty0 + j)).then(r => { if(r) ctx.drawImage(r.img, i * 256, j * 256, 256, 256); return r; }));
   }
   const results = await Promise.all(jobs);
-  if(results.every(r => r === null)) throw new Error('OpenStreetMap tiles did not load');
+  if(results.every(r => r === null)) throw new Error(label + ' tiles did not load');
   ctx.fillStyle = '#e11d48';
   ctx.beginPath(); ctx.arc(px - tx0 * 256, py - ty0 * 256, 5, 0, Math.PI * 2); ctx.fill();
   const corsOk = results.every(r => r === null || r.cors);
@@ -108,6 +135,20 @@ async function buildNAIP(lat, lon){
     if(r) break;
   }
   if(!r) throw new Error('USGS did not return an image from either service. The USGS server may be slow or unreachable from this page.');
+  const canvas = document.createElement('canvas');
+  canvas.width = 768; canvas.height = 768;
+  canvas.getContext('2d').drawImage(r.img, 0, 0, 768, 768);
+  return { canvas, corsOk: r.cors };
+}
+
+// Azure Maps satellite (imagery layer) as a static image around the address
+async function buildAzure(lat, lon){
+  const key = document.getElementById('azkey').value.trim();
+  if(!key) throw new Error('Enter an Azure Maps key above to test this panel.');
+  const url = 'https://atlas.microsoft.com/map/static/png?api-version=2024-04-01&layer=imagery&style=main'
+    + `&zoom=18&center=${lon},${lat}&width=768&height=768&subscription-key=${encodeURIComponent(key)}`;
+  const r = await loadImg(url);
+  if(!r) throw new Error('Azure Maps did not return an image. Check that the key is correct and active.');
   const canvas = document.createElement('canvas');
   canvas.width = 768; canvas.height = 768;
   canvas.getContext('2d').drawImage(r.img, 0, 0, 768, 768);
@@ -184,10 +225,18 @@ function saveSelection(key){
   }
 }
 
-document.getElementById('osmCrop').onclick = () => cropSelection('osm');
-document.getElementById('naipCrop').onclick = () => cropSelection('naip');
-document.getElementById('osmSave').onclick = () => saveSelection('osm');
-document.getElementById('naipSave').onclick = () => saveSelection('naip');
+for(const k of KEYS){
+  sources[k].crop.onclick = () => cropSelection(k);
+  sources[k].save.onclick = () => saveSelection(k);
+}
+
+const builders = {
+  osm:   (lat, lon) => buildTiles(lat, lon, (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`, 'OpenStreetMap'),
+  naip:  (lat, lon) => buildNAIP(lat, lon),
+  esri:  (lat, lon) => buildTiles(lat, lon, (z, x, y) => `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, 'Esri'),
+  azure: (lat, lon) => buildAzure(lat, lon)
+};
+const notes = { osm: 'Street map loaded.', naip: 'Aerial photo loaded.', esri: 'Esri satellite loaded.', azure: 'Azure satellite loaded.' };
 
 document.getElementById('f').addEventListener('submit', async e => {
   e.preventDefault();
@@ -208,11 +257,13 @@ document.getElementById('f').addEventListener('submit', async e => {
     g.textContent = 'Could not find that address. Try a fuller address with city and state.';
     return;
   }
-  for(const key of ['osm', 'naip']) sources[key].stat.textContent = 'Loading...';
-  buildOSM(lat, lon).then(b => showPicture('osm', b, 'Street map loaded.'))
-    .catch(err => { sources.osm.stat.className = 'status bad'; sources.osm.stat.textContent = err.message; });
-  buildNAIP(lat, lon).then(b => showPicture('naip', b, 'Aerial photo loaded.'))
-    .catch(err => { sources.naip.stat.className = 'status bad'; sources.naip.stat.textContent = err.message; });
+  for(const key of KEYS){
+    sources[key].stat.className = 'status';
+    sources[key].stat.textContent = 'Loading...';
+    builders[key](lat, lon)
+      .then(b => showPicture(key, b, notes[key]))
+      .catch(err => { sources[key].stat.className = 'status bad'; sources[key].stat.textContent = err.message; });
+  }
 });
 </script>
 </body>
