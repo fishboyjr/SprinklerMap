@@ -79,6 +79,8 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 .satctl{display:flex;gap:8px;flex-wrap:wrap}
 .satctl button{flex:1;min-width:110px}
 #satRect{position:absolute;border:2px dashed #facc15;background:rgba(250,204,21,.18);pointer-events:none}
+#satCross{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #111;pointer-events:none}
+#satStage canvas{cursor:grab}
 .satform{display:flex;gap:8px}
 .satform input{flex:1;min-width:0;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px}
 #mapAddr{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;width:100%}
@@ -125,7 +127,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.13</small>
+    <small>Tap anywhere to continue · v1.14</small>
   </div>
 </div>
 
@@ -155,15 +157,20 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
     </form>
     <p id="satStatus" class="muted"></p>
     <div id="satStage"></div>
-    <div class="satctl">
-      <button id="satZoomOut">Zoom out</button>
-      <button id="satZoomIn">Zoom in</button>
-      <button id="satRotL">Rotate left</button>
-      <button id="satRotR">Rotate right</button>
+    <div id="satViewCtl">
+      <div class="satctl">
+        <button id="satZoomOut">Zoom out</button>
+        <button id="satZoomIn">Zoom in</button>
+        <button id="satRotL">Rotate left</button>
+        <button id="satRotR">Rotate right</button>
+      </div>
+      <button id="satDraw" class="primary big">This view shows my yard. Draw the box</button>
     </div>
-    <p class="muted">Zoom and rotate first, then draw the box. Changing the view clears the box.</p>
+    <div id="satBoxCtl" hidden>
+      <button id="satUse" class="primary big" disabled>Use this box</button>
+      <button id="satAdjust" class="big">Back to moving the map</button>
+    </div>
     <p class="muted">Imagery: Esri, Vantor, Earthstar Geographics, and the GIS User Community.</p>
-    <button id="satUse" class="primary big" disabled>Use this box</button>
     <button id="satBack" class="big">Back</button>
   </div>
 </div>
@@ -1074,7 +1081,8 @@ document.addEventListener('touchmove', e=>{
 // The picture is built from map tiles inside the app, so the box is cut from the app's own copy.
 const SAT_ZOOM = 19, SAT_GRID = 4, SAT_PX = 1024;
 // satBase: the downloaded tiles; satCanvas: the current view (zoomed and rotated) that the box is drawn on
-let satBase = null, satAddr = null, satZoom = 1, satRot = 0;
+let satBase = null, satAddr = null, satZoom = 1, satRot = 0, satOff = {x:0, y:0};
+let satView = null, satMode = 'view', satPan = null;
 let satCanvas = null, satTainted = false, satSel = null, satDragging = false;
 
 function loadTile(url){
@@ -1131,49 +1139,83 @@ function openSat(){
 
 function showSatPicture(built){
   satBase = built.canvas; satAddr = built.addr; satTainted = built.tainted;
-  satZoom = 1; satRot = 0;
+  satZoom = 1; satRot = 0; satOff = {x:0, y:0};
+  const stage = $('#satStage');
+  stage.innerHTML = '';
+  satView = document.createElement('canvas');
+  satView.width = 1024; satView.height = 1024;
+  stage.appendChild(satView);
+  const cross = document.createElement('div');
+  cross.id = 'satCross';
+  stage.appendChild(cross);
+  const r = document.createElement('div');
+  r.id = 'satRect'; r.hidden = true;
+  stage.appendChild(r);
+  satEnterView();
   renderSat();
-  if(built.tainted){
-    $('#satStatus').textContent = 'This browser will not let this picture be saved. Go back and use a screenshot instead.';
-  } else {
-    $('#satStatus').textContent = 'Zoom and rotate if needed, then draw a box around your property and tap Use this box.';
-  }
+}
+
+// view mode: move, zoom and rotate the map; box mode: the view is fixed and the box is drawn
+function satEnterView(){
+  satMode = 'view'; satCanvas = satView; satSel = null;
+  $('#satRect').hidden = true;
+  $('#satCross').hidden = false;
+  $('#satViewCtl').hidden = false;
+  $('#satBoxCtl').hidden = true;
+  $('#satUse').disabled = true;
+  $('#satStatus').textContent = 'Drag to move the map. Use the buttons to zoom or rotate. When your yard is in the middle, tap "This view shows my yard".';
+}
+function satEnterBox(){
+  if(!satBase) return;
+  satMode = 'box'; satCanvas = satView; satSel = null;
+  $('#satRect').hidden = true;
+  $('#satCross').hidden = true;
+  $('#satViewCtl').hidden = true;
+  $('#satBoxCtl').hidden = false;
+  $('#satUse').disabled = true;
+  $('#satStatus').textContent = satTainted
+    ? 'This browser will not let this picture be saved. Go back and use a screenshot instead.'
+    : 'Draw a box around your property, then tap Use this box.';
+}
+
+// pan: drag moves the content with the pointer, turned and zoomed as shown
+function satPanMove(e){
+  if(!satPan) return;
+  const dx = e.clientX - satPan.x, dy = e.clientY - satPan.y;
+  satPan = {x: e.clientX, y: e.clientY};
+  const k = satView.width / satView.getBoundingClientRect().width / satZoom; // source px per screen px
+  const t = satRot * Math.PI / 180, c = Math.cos(t), s = Math.sin(t);
+  const sx = dx * k, sy = dy * k;
+  satOff.x -= sx * c + sy * s;
+  satOff.y -= -sx * s + sy * c;
+  renderSat();
 }
 
 // draw the view: the address sits in the middle, turned and zoomed as the user chose
 function renderSat(){
-  if(!satBase) return;
-  const V = 1024;
-  const v = document.createElement('canvas');
-  v.width = V; v.height = V;
-  const ctx = v.getContext('2d');
+  if(!satBase || !satView) return;
+  const V = satView.width;
+  const ctx = satView.getContext('2d');
   ctx.fillStyle = '#ddd'; ctx.fillRect(0, 0, V, V);
   ctx.save();
   ctx.translate(V / 2, V / 2);
   ctx.rotate(satRot * Math.PI / 180);
   ctx.scale(satZoom, satZoom);
-  ctx.translate(-satAddr.x, -satAddr.y);
+  ctx.translate(-(satAddr.x + satOff.x), -(satAddr.y + satOff.y));
   ctx.drawImage(satBase, 0, 0);
   ctx.restore();
-  satCanvas = v; satSel = null; satDragging = false;
-  const stage = $('#satStage');
-  stage.innerHTML = '';
-  stage.appendChild(v);
-  const r = document.createElement('div');
-  r.id = 'satRect'; r.hidden = true;
-  stage.appendChild(r);
-  $('#satUse').disabled = true;
 }
 function satChangeView(fn){
-  if(!satBase) return;
+  if(!satBase || satMode !== 'view') return;
   fn();
   renderSat();
-  if(!satTainted) $('#satStatus').textContent = 'Draw a box around your property, then tap Use this box.';
 }
 $('#satZoomIn').onclick  = ()=>satChangeView(()=>{ satZoom = Math.min(4, satZoom * 1.5); });
 $('#satZoomOut').onclick = ()=>satChangeView(()=>{ satZoom = Math.max(0.75, satZoom / 1.5); });
 $('#satRotL').onclick    = ()=>satChangeView(()=>{ satRot = (satRot + 270) % 360; });
 $('#satRotR').onclick    = ()=>satChangeView(()=>{ satRot = (satRot + 90) % 360; });
+$('#satDraw').onclick    = ()=>satEnterBox();
+$('#satAdjust').onclick  = ()=>satEnterView();
 
 function satPoint(e){
   const r = $('#satStage').getBoundingClientRect();
@@ -1189,22 +1231,26 @@ function drawSatRect(){
   el.style.height = (Math.abs(satSel.y1-satSel.y0)*100)+'%';
 }
 $('#satStage').addEventListener('pointerdown', e=>{
-  if(!satCanvas || satTainted) return;
+  if(!satView) return;
   e.preventDefault();
+  try{ $('#satStage').setPointerCapture(e.pointerId); }catch(_){}
+  if(satMode === 'view'){ satPan = {x: e.clientX, y: e.clientY}; return; }
+  if(satTainted) return;
   const p = satPoint(e);
   satDragging = true;
   satSel = {x0:p.x, y0:p.y, x1:p.x, y1:p.y};
   $('#satUse').disabled = true;
   drawSatRect();
-  try{ $('#satStage').setPointerCapture(e.pointerId); }catch(_){}
 });
 $('#satStage').addEventListener('pointermove', e=>{
+  if(satMode === 'view'){ satPanMove(e); return; }
   if(!satDragging) return;
   const p = satPoint(e);
   satSel.x1 = p.x; satSel.y1 = p.y;
   drawSatRect();
 });
 function endSatDrag(){
+  if(satPan){ satPan = null; return; }
   if(!satDragging) return;
   satDragging = false;
   const big = satSel && Math.abs(satSel.x1-satSel.x0) >= 0.05 && Math.abs(satSel.y1-satSel.y0) >= 0.05;
