@@ -17,7 +17,6 @@ header{flex:none;position:sticky;top:0;z-index:20;background:#fff;border-bottom:
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
 .tabs button{border:none;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 14px;color:var(--muted);min-height:44px;white-space:nowrap}
 .tabs button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;background:none}
-.toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px 0;align-items:center}
 button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
 button:disabled{opacity:.45;cursor:default}
 button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -25,14 +24,17 @@ button.on{background:#e8f0fe;border-color:var(--accent);color:var(--accent);font
 button.danger{color:var(--red)}
 button.sm{min-height:30px;padding:4px 8px}
 button.big{min-height:48px;font-size:16px;width:100%}
-#hint{font-size:14px;color:var(--muted);padding-bottom:8px;min-height:28px}
+#hint{font-size:14px;color:var(--muted);padding:8px 0;min-height:36px}
 main{flex:1;min-height:0;width:100%;display:flex;flex-direction:row;align-items:stretch;gap:12px;padding:12px;max-width:1400px;margin:0 auto}
 @media(max-width:640px){main{flex-direction:column}}
-#stageWrap{flex:1;min-width:0;min-height:0;display:flex;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:auto;-webkit-overflow-scrolling:touch}
+#stageWrap{flex:1;min-width:0;min-height:0;display:flex;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
 #stage{position:relative;flex:none;margin:auto}
 #stage img{display:block;width:100%;height:100%;user-select:none;-webkit-user-drag:none}
 #stage.place{cursor:crosshair}
 #layer{position:absolute;inset:0;pointer-events:none}
+#zoomCtl{position:absolute;left:100%;top:8px;margin-left:8px;display:flex;flex-direction:column;align-items:center;gap:4px;z-index:5}
+#zoomCtl button{width:42px;min-height:42px;padding:0;font-size:22px;line-height:1;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+#zoomLbl{font-size:11px;color:var(--muted)}
 .mk{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);touch-action:none;cursor:pointer;user-select:none;pointer-events:auto;white-space:nowrap}
 .head{width:24px;height:24px;border-radius:50%;background:#1f6feb}
 .head.unassigned{background:var(--red)}
@@ -49,7 +51,6 @@ main{flex:1;min-height:0;width:100%;display:flex;flex-direction:row;align-items:
 #side section{display:flex;flex-direction:column;gap:8px}
 .muted{color:var(--muted);font-size:13px;margin:0}
 .warn{background:var(--warnbg);color:var(--warn);padding:8px;border-radius:8px;font-size:13px;margin:0}
-.row{display:flex;gap:6px;flex-wrap:wrap}
 .zrow{display:flex;align-items:center;gap:6px;padding:4px;border-radius:8px;border:1px solid transparent}
 .zrow.on{border-color:var(--accent);background:#f0f6ff}
 .zrow input{flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;font:inherit}
@@ -106,7 +107,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.3</small>
+    <small>Tap anywhere to continue · v1.4</small>
   </div>
 </div>
 
@@ -136,23 +137,32 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   </div>
 </div>
 
+<div id="printDlg" class="overlay" hidden>
+  <div class="card">
+    <h2>Print</h2>
+    <label class="radio"><input type="radio" name="pm" value="overview" checked> Overview</label>
+    <label class="radio"><input type="radio" name="pm" value="zones"> Overview + zone detail</label>
+    <p class="muted">Overview shows the yard map with a legend. Zone detail adds one sheet per zone with its heads and equipment.</p>
+    <button id="printGo" class="primary big">Print</button>
+    <button id="printCancel" class="big">Cancel</button>
+  </div>
+</div>
+
 <header>
   <div class="topbar">
-    <span class="title">Sprinkler Map<span class="ver">v1.3</span></span>
+    <span class="title">Sprinkler Map<span class="ver">v1.4</span></span>
     <button id="bUndo" disabled>Undo</button>
     <button id="bNew">New</button>
     <button id="bOpen">Open</button>
     <button id="bSave" class="primary">Save</button>
-    <button id="bPic">Change picture</button>
     <button id="bPrint">Print</button>
   </div>
   <nav class="tabs" id="tabs">
     <button data-tab="map">Map</button>
     <button data-tab="zones">Zones</button>
+    <button data-tab="heads">Sprinkler Heads</button>
     <button data-tab="equip">Equipment</button>
-    <button data-tab="print">Print</button>
   </nav>
-  <div class="toolbar" id="toolbar"></div>
   <div id="hint"></div>
 </header>
 
@@ -161,6 +171,11 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
     <div id="stage">
       <img id="mapImg" alt="Yard map" draggable="false">
       <div id="layer"></div>
+      <div id="zoomCtl">
+        <button data-zoom="1" aria-label="Zoom in">+</button>
+        <span id="zoomLbl">100%</span>
+        <button data-zoom="-1" aria-label="Zoom out">−</button>
+      </div>
     </div>
   </div>
   <aside id="side"></aside>
@@ -183,6 +198,7 @@ const KIND = {
 const HEAD_TYPES = ['unknown','spray','rotor','drip','bubbler','other'];
 const HEAD_LABEL = {unknown:'Not sure',spray:'Spray',rotor:'Rotor',drip:'Drip',bubbler:'Bubbler',other:'Other'};
 const MAX_UNDO = 50;
+const ZOOM_MIN = 1, ZOOM_MAX = 4;
 
 let doc;
 let tab = 'map', mode = 'select', sel = null, activeZone = null, dirty = false, zoom = 1;
@@ -199,6 +215,9 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 const zoneById = id => doc.zones.find(z => z.id === id);
 const findItem = id => doc.heads.find(h => h.id === id) || doc.equipment.find(q => q.id === id);
 const zoneLabel = z => z ? `Zone ${z.num}${z.name ? ' – ' + z.name : ''}` : 'no zone';
+const isHead = it => doc.heads.includes(it);
+// heads are edited on the Sprinkler Heads tab, equipment on the Equipment tab
+const canEdit = it => it && ((tab === 'heads' && isHead(it)) || (tab === 'equip' && !isHead(it)));
 
 function newDoc(){
   return {
@@ -258,7 +277,31 @@ function undo(){
   renderAll();
 }
 
-/* ---------- rendering ---------- */
+/* ---------- map rendering & zoom ---------- */
+// size the map so the whole picture fits the visible area (no page scrolling);
+// zoom grows it inside its own box, and the zoom buttons sit to its right
+function fitStage(){
+  const wrap = $('#stageWrap'), st = $('#stage');
+  if(!doc.image || !doc.mapW || wrap.hidden) return;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  if(!W || !H) return;
+  const ratio = doc.mapH / doc.mapW;
+  const fit = Math.min(W - 64, (H - 8) / ratio);
+  const w = Math.max(1, fit * zoom);
+  st.style.width = w + 'px';
+  st.style.height = (w * ratio) + 'px';
+}
+
+function applyZoom(){
+  if(zoom <= ZOOM_MIN){
+    zoom = ZOOM_MIN;
+    const wrap = $('#stageWrap');
+    wrap.scrollTop = 0; wrap.scrollLeft = 0;
+  }
+  fitStage();
+  const lbl = $('#zoomLbl'); if(lbl) lbl.textContent = Math.round(zoom*100) + '%';
+}
+
 function markersHTML(zoneFilter, forPrint){
   const s = forPrint ? null : sel;
   let out = '';
@@ -274,55 +317,16 @@ function markersHTML(zoneFilter, forPrint){
   return out;
 }
 
-// size the map so the whole picture fits the visible area (no page scrolling); zoom grows it inside its own box
-function fitStage(){
-  const wrap = $('#stageWrap'), st = $('#stage');
-  if(!doc.image || !doc.mapW || wrap.hidden) return;
-  const W = wrap.clientWidth, H = wrap.clientHeight;
-  if(!W || !H) return;
-  const ratio = doc.mapH / doc.mapW;
-  const w = Math.max(1, Math.min(W - 4, (H - 4) / ratio) * zoom);
-  st.style.width = w + 'px';
-  st.style.height = (w * ratio) + 'px';
-}
-
-function renderTabs(){
-  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-}
-
-function renderToolbar(){
-  const btn = (m, label, extra='') => `<button data-mode="${m}"${extra}>${label}</button>`;
-  let html;
-  if(tab === 'map'){
-    html = btn('select','Select / move') + btn('head','Sprinkler head') + btn('calibrate','Set scale') + btn('measure','Measure', doc.scale ? '' : ' disabled');
-  } else if(tab === 'equip'){
-    html = btn('select','Select / move') + btn('controller','Controller') + btn('shutoff','Water shutoff') + btn('valve','Valve') + btn('winterize','Winterize point');
-  } else if(tab === 'zones'){
-    html = btn('select','Select / move') + '<span class="muted">Tap a head to select it.</span>';
-  } else {
-    html = '<span class="muted">Preview only. Options are in the side panel.</span>';
-  }
-  html += `<span style="margin-left:auto"></span><button data-zoom="-1">−</button><span id="zoomLbl" class="muted">${Math.round(zoom*100)}%</span><button data-zoom="1">+</button>`;
-  $('#toolbar').innerHTML = html;
-}
-
 function renderMap(){
   const img = $('#mapImg');
   $('#stageWrap').hidden = !doc.image;
   if(doc.image && img.getAttribute('src') !== doc.image) img.src = doc.image;
-  fitStage();
   $('#layer').innerHTML = doc.image ? markersHTML(undefined, false) : '';
-  const lbl = $('#zoomLbl'); if(lbl) lbl.textContent = Math.round(zoom*100) + '%';
-  document.querySelectorAll('#toolbar button[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
-  $('#stage').classList.toggle('place', mode !== 'select' && tab !== 'print');
+  $('#stage').classList.toggle('place', mode !== 'select');
+  applyZoom();
 }
 
-function scaleText(){
-  return doc.scale
-    ? 'Scale is set. Use Measure in the toolbar to read distances in feet.'
-    : 'Not set. Use Set scale in the toolbar: tap two points a known distance apart, then enter that distance in feet.';
-}
-
+/* ---------- side panels (one per tab) ---------- */
 function zoneRowsHTML(){
   return doc.zones.map(z=>{
     const n = doc.heads.filter(h=>h.zone===z.id).length;
@@ -335,108 +339,136 @@ function zoneRowsHTML(){
   }).join('');
 }
 
+function zoneOptionsHTML(selectedId){
+  return doc.zones.map(z=>`<option value="${z.id}"${z.id===selectedId?' selected':''}>${esc(zoneLabel(z))}</option>`).join('');
+}
+
+function placeButton(m, idleLabel, activeLabel){
+  const on = mode === m;
+  return `<button data-place="${m}" class="${on?'primary':''}">${on ? activeLabel : idleLabel}</button>`;
+}
+
 function mapSide(){
-  const un = doc.heads.filter(h=>!h.zone).length;
-  const zoneOpts = `<option value="">Needs assignment</option>` + doc.zones.map(z=>`<option value="${z.id}"${z.id===activeZone?' selected':''}>${esc(zoneLabel(z))}</option>`).join('');
-  let editor = '<p class="muted">Tap a head on the map to edit it, or drag it to move it.</p>';
-  const it = sel && findItem(sel);
-  if(it && doc.heads.includes(it)){
-    editor = `<h3>Selected head</h3>
-      <label>Zone<select data-hzone="${it.id}"><option value="">Needs assignment</option>${doc.zones.map(z=>`<option value="${z.id}"${z.id===it.zone?' selected':''}>${esc(zoneLabel(z))}</option>`).join('')}</select></label>
-      <label>Head type<select data-htype="${it.id}">${HEAD_TYPES.map(t=>`<option value="${t}"${t===it.type?' selected':''}>${HEAD_LABEL[t]}</option>`).join('')}</select></label>
-      <button class="danger" data-del="${it.id}">Delete head</button>`;
-  } else if(it){
-    editor = `<p class="muted">${esc(it.code)} is selected. Edit it on the Equipment tab.</p>
-      <button data-switch-tab="equip">Go to Equipment</button>`;
-  }
+  const scaleMsg = doc.scale
+    ? 'Scale is set. Measure reads distances in feet.'
+    : 'Not set. Tap Set scale, then tap two points a known distance apart and enter that distance in feet.';
+  const measureNote = lastDist !== null && mode === 'measure' ? `<p class="muted">Last distance: ${lastDist} ft</p>` : '';
   return `
     <section>
-      <h3>Scale</h3>
-      <p class="muted">${scaleText()}</p>
+      <h3>Picture</h3>
+      <p class="muted">Changing the picture keeps your heads and equipment, but the scale is reset.</p>
+      <button data-change-pic>Change picture</button>
     </section>
     <section>
-      <h3>Active zone</h3>
-      <p class="muted">New heads go to this zone.</p>
-      <select data-activezone>${zoneOpts}</select>
-      <p class="muted">Heads needing assignment: <b>${un}</b></p>
+      <h3>Scale</h3>
+      <p class="muted">${scaleMsg}</p>
+      ${placeButton('calibrate', 'Set scale', 'Stop setting scale')}
+      <button data-place="measure" class="${mode==='measure'?'primary':''}" ${doc.scale?'':'disabled'}>${mode==='measure'?'Stop measuring':'Measure'}</button>
+      ${measureNote}
     </section>
-    <section>${editor}</section>`;
+    <section>
+      <h3>Yard</h3>
+      <p class="muted">${doc.heads.length} head(s), ${doc.equipment.length} equipment item(s), ${doc.zones.length} zone(s).</p>
+    </section>`;
 }
 
 function zonesSide(){
-  const un = doc.heads.filter(h=>!h.zone).length;
   return `
     <section>
       <h3>Zones</h3>
-      <p class="muted">Tap a zone to make it active on the Map tab. Names are optional.</p>
+      <p class="muted">Tap a zone to make it active. Heads you add go to the active zone. Names are optional.</p>
       ${zoneRowsHTML() || '<p class="muted">No zones yet.</p>'}
       <button data-zadd>+ Add zone</button>
-    </section>
+    </section>`;
+}
+
+function headsSide(){
+  const zoneOpts = `<option value="">Needs assignment</option>` + zoneOptionsHTML(activeZone);
+  const list = doc.heads.map(h=>{
+    const z = zoneById(h.zone);
+    const name = [h.company, h.model].filter(Boolean).join(' ');
+    return `<button class="eqrow${h.id===sel?' on':''}" data-select="${h.id}">${z ? 'Zone '+z.num : 'Needs zone'}${name ? ' · '+esc(name) : ''}</button>`;
+  }).join('') || '<p class="muted">No heads yet. Tap Add heads, then tap the map.</p>';
+
+  let editor = '<p class="muted">Tap a head in the list or on the map to edit it.</p>';
+  const it = sel && findItem(sel);
+  if(it && isHead(it)){
+    editor = `<h3>Selected head</h3>
+      <label>Zone<select data-hzone="${it.id}"><option value="">Needs assignment</option>${zoneOptionsHTML(it.zone)}</select></label>
+      <label>Company (optional)<input type="text" data-hcompany="${it.id}" value="${esc(it.company)}"></label>
+      <label>Model # (optional)<input type="text" data-hmodel="${it.id}" value="${esc(it.model)}"></label>
+      <label>Head type<select data-htype="${it.id}">${HEAD_TYPES.map(t=>`<option value="${t}"${t===it.type?' selected':''}>${HEAD_LABEL[t]}</option>`).join('')}</select></label>
+      <button class="danger" data-del="${it.id}">Delete head</button>`;
+  }
+
+  return `
     <section>
-      <h3>Unassigned heads</h3>
-      <p class="muted"><b>${un}</b> head(s) need a zone.</p>
-      <button data-next-unassigned ${un ? '' : 'disabled'}>Find next unassigned head</button>
+      <h3>Add heads</h3>
+      ${placeButton('head', 'Add heads', 'Stop adding heads')}
+      <label>Active zone<select data-activezone>${zoneOpts}</select></label>
+      <p class="muted">New heads go to the active zone. Heads without a zone show in red.</p>
+    </section>
+    <section>${editor}</section>
+    <section>
+      <h3>All heads</h3>
+      <div class="eqlist">${list}</div>
     </section>`;
 }
 
 function equipSide(){
+  const buttons = Object.keys(KIND).map(k=>placeButton(k, 'Add ' + KIND[k].name.toLowerCase(), 'Stop adding ' + KIND[k].name.toLowerCase())).join('');
   const rows = doc.equipment.map(q=>`<button class="eqrow${q.id===sel?' on':''}" data-select="${q.id}">${esc(q.code)} · ${esc(q.name)}</button>`).join('')
-    || '<p class="muted">No equipment yet. Choose a type in the toolbar, then tap the map.</p>';
+    || '<p class="muted">No equipment yet.</p>';
   let editor = '<p class="muted">Tap an item in the list or on the map to edit it.</p>';
   const it = sel && findItem(sel);
-  if(it && !doc.heads.includes(it)){
+  if(it && !isHead(it)){
     editor = `<h3>${esc(KIND[it.kind].name)} · ${esc(it.code)}</h3>
-      <label>Name<input data-ename="${it.id}" value="${esc(it.name)}"></label>
+      <label>Name<input type="text" data-ename="${it.id}" value="${esc(it.name)}"></label>
       <label>Notes<textarea data-enotes="${it.id}" rows="2">${esc(it.notes)}</textarea></label>
       <button class="danger" data-del="${it.id}">Delete</button>`;
-  } else if(it){
-    editor = `<p class="muted">A sprinkler head is selected. Edit it on the Map tab.</p>
-      <button data-switch-tab="map">Go to Map</button>`;
   }
   return `
     <section>
-      <h3>Equipment</h3>
+      <h3>Add equipment</h3>
+      <p class="muted">Tap a button, then tap the map. Tap the button again to stop.</p>
+      ${buttons}
+    </section>
+    <section>
+      <h3>Items</h3>
       <div class="eqlist">${rows}</div>
     </section>
     <section>${editor}</section>`;
 }
 
-function printSide(){
-  return `
-    <section>
-      <h3>Print</h3>
-      <label class="radio"><input type="radio" name="pm" value="overview" ${printMode==='overview'?'checked':''}> Overview</label>
-      <label class="radio"><input type="radio" name="pm" value="zones" ${printMode==='zones'?'checked':''}> Overview + zone detail</label>
-      <button class="primary" data-print>Print</button>
-    </section>
-    <section>
-      <p class="muted">Each sheet shows the map, zone and equipment lists, the last-updated date, and a disclaimer.</p>
-    </section>`;
+function renderSide(){
+  const body = {map:mapSide, zones:zonesSide, heads:headsSide, equip:equipSide}[tab]();
+  $('#side').innerHTML = (autoNote ? `<p class="warn">${esc(autoNote)}</p>` : '') + body;
 }
 
-function renderSide(){
-  const body = {map:mapSide, zones:zonesSide, equip:equipSide, print:printSide}[tab]();
-  $('#side').innerHTML = (autoNote ? `<p class="warn">${esc(autoNote)}</p>` : '') + body;
+function renderTabs(){
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
 }
 
 function hintText(){
   if(flashMsg) return flashMsg;
-  if(tab === 'zones') return 'Tap a zone in the side panel to make it active. Use Find next unassigned head to fix heads that need a zone.';
-  if(tab === 'print') return 'Preview only. Choose print options in the side panel.';
   switch(mode){
-    case 'select': return 'Tap an item to edit it. Drag to move it.';
-    case 'head': return `Tap the map to add a sprinkler head to ${activeZone ? zoneLabel(zoneById(activeZone)) : 'no zone (needs assignment)'}.`;
+    case 'head': return `Tap the map to add a head to ${activeZone ? zoneLabel(zoneById(activeZone)) : 'no zone (needs assignment)'}. Tap Stop adding heads when done.`;
     case 'calibrate': return `Tap two points a known distance apart (${measurePts.length}/2).`;
     case 'measure':
       if(measurePts.length===0 && lastDist!==null) return `Last distance: ${lastDist} ft. Tap two points to measure again.`;
       return `Tap two points to measure (${measurePts.length}/2).`;
-    default: return `Tap the map to place a ${KIND[mode].name.toLowerCase()}.`;
+    case 'select':
+      if(tab === 'map') return 'Use the side panel to change the picture or set the scale. Pinch or use + and − to zoom.';
+      if(tab === 'zones') return 'Tap a zone in the side panel to make it active.';
+      if(tab === 'heads') return 'Tap a head to edit it. Drag to move it. Use Add heads to place new ones.';
+      return 'Tap an item to edit it. Drag to move it. Use the side panel to add equipment.';
+    default: return `Tap the map to place a ${KIND[mode].name.toLowerCase()}. Tap the button again to stop.`;
   }
 }
 function updateHint(){ $('#hint').textContent = hintText(); }
 
 function renderAll(){
-  renderTabs(); renderToolbar(); renderMap(); renderSide(); updateHint(); updateUndo();
+  renderTabs(); renderMap(); renderSide(); updateHint(); updateUndo();
 }
 
 function setTab(t){
@@ -444,9 +476,18 @@ function setTab(t){
   renderAll();
 }
 
-function setMode(m){
-  mode = m; measurePts = []; flashMsg = '';
-  lastDist = (m === 'measure') ? lastDist : null;
+// placement modes toggle: tapping the active button turns placing off
+function togglePlace(m){
+  if(m === 'calibrate' || m === 'measure'){
+    mode = (mode === m) ? 'select' : m;
+    measurePts = [];
+    flashMsg = '';
+    lastDist = (mode === 'measure') ? lastDist : null;
+  } else {
+    mode = (mode === m) ? 'select' : m;
+    measurePts = [];
+    flashMsg = '';
+  }
   renderAll();
 }
 
@@ -465,7 +506,7 @@ function addZone(){
 function deleteZone(id){
   const z = zoneById(id);
   const n = doc.heads.filter(h=>h.zone===id).length;
-  if(!confirm(`Delete ${zoneLabel(z)}?${n ? ` Its ${n} head(s) will need assignment.` : ''}`)) return;
+  if(!confirm(`Delete ${zoneLabel(z)}?${n ? ` Its ${n} head(s) will need a zone.` : ''}`)) return;
   checkpoint();
   doc.heads.forEach(h=>{ if(h.zone===id) h.zone = null; });
   doc.zones = doc.zones.filter(z=>z.id!==id);
@@ -477,7 +518,7 @@ function addItem(kind, p){
   checkpoint();
   let it;
   if(kind==='head'){
-    it = {id:uid(), x:p.x, y:p.y, zone:activeZone, type:'unknown'};
+    it = {id:uid(), x:p.x, y:p.y, zone:activeZone, type:'unknown', company:'', model:''};
     doc.heads.push(it);
   } else {
     const pre = KIND[kind].prefix;
@@ -493,7 +534,7 @@ function addItem(kind, p){
 function deleteItem(id){
   const it = findItem(id);
   if(!it) return;
-  const label = doc.heads.includes(it) ? 'sprinkler head' : KIND[it.kind].name.toLowerCase();
+  const label = isHead(it) ? 'sprinkler head' : KIND[it.kind].name.toLowerCase();
   if(!confirm(`Delete this ${label}?`)) return;
   checkpoint();
   doc.heads = doc.heads.filter(h=>h.id!==id);
@@ -513,8 +554,9 @@ function finishMeasure(){
       checkpoint();
       doc.scale = {feetPerImgPx: ft/px};
       touch();
-      setMode('select');
+      mode = 'select';
       flash('Scale set.');
+      renderAll();
     } else {
       flash('Scale not set. Try two points farther apart and enter the distance in feet.');
       renderMap();
@@ -523,7 +565,7 @@ function finishMeasure(){
     const ft = px * doc.scale.feetPerImgPx;
     lastDist = ft.toFixed(1);
     measurePts = [];
-    renderMap(); updateHint();
+    renderMap(); renderSide(); updateHint();
   }
 }
 
@@ -660,20 +702,46 @@ $('#fileOpen').addEventListener('change', e=>{
   r.readAsText(f);
 });
 $('#bSave').onclick = saveFile;
-$('#bPrint').onclick = ()=>setTab('print');
-$('#bPic').onclick = ()=>showSetup();
+$('#bPrint').onclick = ()=>{ $('#printDlg').hidden = false; };
+$('#printCancel').onclick = ()=>{ $('#printDlg').hidden = true; };
+$('#printGo').onclick = ()=>{
+  const v = document.querySelector('input[name=pm]:checked');
+  printMode = v ? v.value : 'overview';
+  $('#printDlg').hidden = true;
+  printSheets();
+};
 
-// tabs and toolbar
+// tabs
 $('#tabs').addEventListener('click', e=>{
   const b = e.target.closest('button[data-tab]');
   if(b) setTab(b.dataset.tab);
 });
-$('#toolbar').addEventListener('click', e=>{
-  const z = e.target.closest('[data-zoom]');
-  if(z){ zoom = Math.min(3, Math.max(1, zoom + 0.5*Number(z.dataset.zoom))); renderMap(); return; }
-  const b = e.target.closest('button[data-mode]');
-  if(b && !b.disabled) setMode(b.dataset.mode);
+
+// zoom buttons (on the map) and pinch-to-zoom
+$('#zoomCtl').addEventListener('click', e=>{
+  const b = e.target.closest('[data-zoom]');
+  if(!b) return;
+  zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom + 0.5*Number(b.dataset.zoom)));
+  applyZoom();
 });
+function touchDist(e){
+  const a = e.touches[0], b = e.touches[1];
+  return Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY) || 1;
+}
+let pinch = null;
+const wrapEl = $('#stageWrap');
+wrapEl.addEventListener('touchstart', e=>{
+  if(e.touches.length === 2) pinch = {d0: touchDist(e), z0: zoom};
+}, {passive:true});
+wrapEl.addEventListener('touchmove', e=>{
+  if(!pinch || e.touches.length !== 2) return;
+  e.preventDefault();
+  zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, pinch.z0 * touchDist(e) / pinch.d0));
+  applyZoom();
+}, {passive:false});
+function endPinch(e){ if(!e.touches || e.touches.length < 2) pinch = null; }
+wrapEl.addEventListener('touchend', endPinch, {passive:true});
+wrapEl.addEventListener('touchcancel', ()=>{ pinch = null; }, {passive:true});
 
 // setup / picture
 document.querySelectorAll('[data-src]').forEach(b=>{
@@ -707,8 +775,11 @@ $('#fileImg').addEventListener('change', e=>{
 
 // map stage: placing, selecting, dragging
 $('#stage').addEventListener('pointerdown', e=>{
+  if(e.target.closest('#zoomCtl')) return;
   const mk = e.target.closest('.mk');
-  if(!mk || mode!=='select' || tab==='print' || !mk.dataset.id) return;
+  if(!mk || mode!=='select' || !mk.dataset.id) return;
+  const it = findItem(mk.dataset.id);
+  if(!canEdit(it)) return;
   e.preventDefault();
   sel = mk.dataset.id;
   drag = {id:sel, el:mk, moved:false, snap:snap()};
@@ -730,45 +801,44 @@ function endDrag(){
   const d = drag;
   drag = null;
   if(d.moved){ checkpoint(d.snap); suppressClick = true; touch(); }
-  renderAll();
+  renderMap();
 }
 $('#stage').addEventListener('pointerup', endDrag);
 $('#stage').addEventListener('pointercancel', endDrag);
 
 $('#stage').addEventListener('click', e=>{
-  if(!doc.image || tab==='print') return;
+  if(!doc.image || e.target.closest('#zoomCtl')) return;
   if(suppressClick){ suppressClick = false; return; }
-  if(e.target.closest('.mk')) return;
+  if(e.target.closest('.mk')){
+    const it = findItem(e.target.closest('.mk').dataset.id);
+    if(mode==='select' && canEdit(it)){ sel = it.id; renderAll(); }
+    return;
+  }
   const p = pt(e);
   if(mode==='select'){ if(sel){ sel = null; renderAll(); } return; }
-  if(mode==='head'){ addItem('head', p); return; }
+  if(mode==='head'){ if(tab==='heads') addItem('head', p); return; }
   if(mode==='calibrate' || mode==='measure'){
     measurePts.push(p);
     if(measurePts.length===2) finishMeasure();
     else { renderMap(); updateHint(); }
     return;
   }
-  addItem(mode, p);
+  if(KIND[mode] && tab==='equip') addItem(mode, p);
 });
 
 // side panel
 $('#side').addEventListener('click', e=>{
   const t = e.target;
+  const pl = t.closest('[data-place]');
+  if(pl){ togglePlace(pl.dataset.place); return; }
+  if(t.closest('[data-change-pic]')){ showSetup(); return; }
   if(t.closest('[data-zadd]')){ addZone(); return; }
   const zd = t.closest('[data-zdel]');
   if(zd){ deleteZone(zd.dataset.zdel); return; }
   const del = t.closest('[data-del]');
   if(del){ deleteItem(del.dataset.del); return; }
-  if(t.closest('[data-print]')){ printSheets(); return; }
-  const sw = t.closest('[data-switch-tab]');
-  if(sw){ setTab(sw.dataset.switchTab); return; }
   const sel2 = t.closest('[data-select]');
   if(sel2){ sel = sel2.dataset.select; renderAll(); return; }
-  if(t.closest('[data-next-unassigned]')){
-    const h = doc.heads.find(h=>!h.zone);
-    if(h){ sel = h.id; setTab('map'); flash('Choose a zone for this head in the side panel.'); }
-    return;
-  }
   const row = t.closest('[data-zrow]');
   if(row && !t.closest('input,button')){
     activeZone = row.dataset.zrow;
@@ -789,10 +859,12 @@ $('#side').addEventListener('input', e=>{
   if(t.dataset.zname) return textEdit(()=>{ const z = zoneById(t.dataset.zname); if(z) z.name = t.value; });
   if(t.dataset.ename) return textEdit(()=>{ const it = findItem(t.dataset.ename); if(it) it.name = t.value; });
   if(t.dataset.enotes) return textEdit(()=>{ const it = findItem(t.dataset.enotes); if(it) it.notes = t.value; });
+  if(t.dataset.hcompany) return textEdit(()=>{ const h = findItem(t.dataset.hcompany); if(h) h.company = t.value; });
+  if(t.dataset.hmodel) return textEdit(()=>{ const h = findItem(t.dataset.hmodel); if(h) h.model = t.value; });
 });
 $('#side').addEventListener('change', e=>{
   const t = e.target;
-  if(t.dataset.activezone !== undefined){ activeZone = t.value || null; updateHint(); return; }
+  if(t.dataset.activezone !== undefined){ activeZone = t.value || null; renderAll(); return; }
   if(t.dataset.hzone){
     const h = findItem(t.dataset.hzone);
     if(h){ checkpoint(); h.zone = t.value || null; touch(); renderAll(); }
@@ -801,9 +873,7 @@ $('#side').addEventListener('change', e=>{
   if(t.dataset.htype){
     const h = findItem(t.dataset.htype);
     if(h){ checkpoint(); h.type = t.value; touch(); }
-    return;
   }
-  if(t.name==='pm'){ printMode = t.value; }
 });
 
 // keyboard undo (Cmd/Ctrl+Z) outside text fields
@@ -821,8 +891,8 @@ document.addEventListener('touchmove', e=>{
   const dy = e.touches[0].clientY - touchStartY;
   const sw = $('#stageWrap');
   const sd = $('#side');
-  const scrollingMap = (sw && sw.contains(e.target) && sw.scrollTop > 0) || (sd.contains(e.target) && sd.scrollTop > 0);
-  if(window.scrollY <= 0 && dy > 0 && !scrollingMap) e.preventDefault();
+  const scrollingInner = (sw && sw.contains(e.target) && sw.scrollTop > 0) || (sd.contains(e.target) && sd.scrollTop > 0);
+  if(window.scrollY <= 0 && dy > 0 && !scrollingInner) e.preventDefault();
 }, {passive:false});
 
 // crop step: draw a box around the property before saving the picture
@@ -886,6 +956,7 @@ function applyCrop(useCrop){
   touch();
   $('#crop').hidden = true;
   mode = 'select';
+  zoom = 1;
   renderAll();
   flash('Picture saved. Next, set the scale.');
 }
