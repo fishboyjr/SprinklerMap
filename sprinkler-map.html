@@ -53,7 +53,7 @@ main{flex:1;min-height:0;width:100%;display:flex;flex-direction:row;align-items:
 .warn{background:var(--warnbg);color:var(--warn);padding:8px;border-radius:8px;font-size:13px;margin:0}
 .zrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:4px;border-radius:8px;border:1px solid transparent}
 .zrow.on{border-color:var(--accent);background:#f0f6ff}
-.zsel{flex-basis:100%;padding:4px 6px;font-size:13px}
+.zmove{flex-basis:100%;display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:13px}
 .zrow input{flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;font:inherit}
 .chip{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 5px;border-radius:13px;color:#fff;font-weight:700;font-size:12px;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
 .cnt{font-size:13px;color:var(--muted);min-width:18px;text-align:right}
@@ -76,6 +76,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 #cropRect{position:absolute;border:2px dashed #facc15;background:rgba(250,204,21,.18);pointer-events:none}
 #mapAddr{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;width:100%}
 .legend{display:grid;grid-template-columns:1fr 1.5fr;gap:12px;margin-top:6px;font-size:10px;break-inside:avoid;page-break-inside:avoid;text-align:left}
+.legend.three{grid-template-columns:1fr 1.2fr 1.2fr}
 .legend h4{margin:0 0 4px;font-size:11px}
 .lg-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:4px}
 .lg-eq{display:flex;align-items:flex-start;gap:6px;margin-bottom:4px}
@@ -116,7 +117,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.6</small>
+    <small>Tap anywhere to continue · v1.7</small>
   </div>
 </div>
 
@@ -159,7 +160,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 
 <header>
   <div class="topbar">
-    <span class="title">Sprinkler Map<span class="ver">v1.6</span></span>
+    <span class="title">Sprinkler Map<span class="ver">v1.7</span></span>
     <button id="bUndo" disabled>Undo</button>
     <button id="bNew">New</button>
     <button id="bOpen">Open</button>
@@ -349,7 +350,7 @@ function zoneRowHTML(z){
       <input data-zname="${z.id}" value="${esc(z.name)}" placeholder="Name (optional)" aria-label="Zone ${z.num} name">
       <span class="cnt">${n}</span>
       <button class="danger sm" data-zdel="${z.id}" aria-label="Delete zone ${z.num}">✕</button>
-      <select class="zsel" data-zctrl="${z.id}" aria-label="Controller for zone ${z.num}"><option value="">No controller</option>${controllers().map(c=>`<option value="${c.id}"${c.id===z.ctrl?' selected':''}>${esc(c.code)} · ${esc(c.name)}</option>`).join('')}</select>
+      <div class="zmove"><span class="muted">Controller:</span>${controllers().map(c=>`<button class="sm${c.id===z.ctrl?' primary':''}" data-zmove="${z.id}" data-ctrl="${c.id}"${c.id===z.ctrl?' disabled':''} aria-label="Move zone ${z.num} to ${esc(c.code)}">${esc(c.code)}</button>`).join('') || '<span class="muted">Add a controller first</span>'}</div>
     </div>`;
   }
 }
@@ -396,24 +397,27 @@ function mapSide(){
 function zonesSide(){
   const ctrls = controllers();
   const orphans = doc.zones.filter(z=>!z.ctrl || !ctrls.some(c=>c.id===z.ctrl));
-  const group = (title, ctrlId, zs, hint) => `
+  const group = (title, zs, hint) => `
     <section>
       <h3>${esc(title)}</h3>
       ${hint ? `<p class="muted">${hint}</p>` : ''}
       ${zs.map(zoneRowHTML).join('') || '<p class="muted">No zones yet.</p>'}
-      <button data-zadd="${ctrlId || ''}">+ Add zone${ctrlId ? ' to ' + esc(ctrlCode(ctrlId)) : ''}</button>
     </section>`;
   let html = `
     <section>
       <h3>Numbering</h3>
       <label class="radio"><input type="radio" name="numb" value="per" ${doc.numbering==='cont'?'':'checked'}> Start at 1 for each controller</label>
       <label class="radio"><input type="radio" name="numb" value="cont" ${doc.numbering==='cont'?'checked':''}> Continue with the next available number</label>
+    </section>
+    <section>
+      <button data-zadd="">+ Add zone</button>
+      <p class="muted">A new zone starts with no controller. Tap a controller button under it to assign it, and its heads go with it.</p>
     </section>`;
   if(!ctrls.length){
-    html += group('Zones', null, orphans, 'Add a controller on the Equipment tab. Zones then group under it. Tap a zone to make it active; names are optional.');
+    html += group('Zones', orphans, 'Add a controller on the Equipment tab, then assign zones to it. Tap a zone to make it active; names are optional.');
   } else {
-    html += ctrls.map(c=>group(`${c.code} · ${c.name}`, c.id, doc.zones.filter(z=>z.ctrl===c.id), 'Tap a zone to make it active. Use a zone\'s Controller menu to move it and its heads to another controller.')).join('');
-    if(orphans.length) html += group('No controller', null, orphans, 'These zones are not on a controller yet.');
+    html += ctrls.map(c=>group(`${c.code} · ${c.name}`, doc.zones.filter(z=>z.ctrl===c.id), 'Tap a zone to make it active. To move a zone and its heads, tap another controller button.')).join('');
+    if(orphans.length) html += group('No controller', orphans, 'Tap a controller button to assign these zones.');
   }
   return html;
 }
@@ -695,22 +699,27 @@ function overviewSheetHTML(s, date, img){
     : `<span class="ex" style="background:${doc.zones[0] ? doc.zones[0].color : '#1f6feb'}">1</span>`;
   const zoneItems = `<div class="lg-row">${headExamples}<span>Zone number${ctrls.length>1 ? ' and controller' : ''}</span></div>`
     + (unassigned ? `<div class="lg-row"><span class="ex unassigned">?</span><span>Needs a zone</span></div>` : '');
-  const eqItems = doc.equipment.map(q=>`<div class="lg-eq"><span class="ex eq eq-${q.kind}">${esc(q.code)}</span><div><b>${esc(KIND[q.kind].name)}</b>${q.name && q.name!==KIND[q.kind].name ? ' – '+esc(q.name) : ''}${q.notes ? `<div class="lg-note">${esc(q.notes)}</div>` : ''}</div></div>`).join('');
+  const eqRows = doc.equipment.map(q=>`<div class="lg-eq"><span class="ex eq eq-${q.kind}">${esc(q.code)}</span><div><b>${esc(KIND[q.kind].name)}</b>${q.name && q.name!==KIND[q.kind].name ? ' – '+esc(q.name) : ''}${q.notes ? `<div class="lg-note">${esc(q.notes)}</div>` : ''}</div></div>`);
+  // equipment is split into two side-by-side columns to keep the legend short
+  const eqHalf = Math.ceil(eqRows.length / 2);
+  const eqCol1 = eqRows.slice(0, eqHalf).join('');
+  const eqCol2 = eqRows.slice(eqHalf).join('');
   return `<section class="sheet">
     <div class="phead">
       <div class="ptitle">${esc(doc.name || 'Sprinkler Map')}</div>
       <div class="psub">${esc(s.title)} · Last updated ${date}</div>
     </div>
     <div class="pwrap"><div class="pstage"><img src="${img}" alt=""><div class="layer">${markersHTML(undefined, true)}</div></div></div>
-    <div class="legend">
+    <div class="legend${eqCol2 ? ' three' : ''}">
       <div class="lg-col">
         <h4>Heads</h4>
         ${zoneItems}
       </div>
       <div class="lg-col">
         <h4>Equipment</h4>
-        ${eqItems || '<div>None marked</div>'}
+        ${eqCol1 || '<div>None marked</div>'}
       </div>
+      ${eqCol2 ? `<div class="lg-col">${eqCol2}</div>` : ''}
     </div>
     <p class="disc">For reference only. Check with a licensed irrigation contractor or qualified professional before sprinkler, plumbing, or winterization work.</p>
   </section>`;
@@ -927,6 +936,8 @@ $('#side').addEventListener('click', e=>{
   if(t.closest('[data-change-pic]')){ showSetup(); return; }
   const za = t.closest('[data-zadd]');
   if(za){ addZone(za.dataset.zadd || null); return; }
+  const zm = t.closest('[data-zmove]');
+  if(zm){ if(!zm.disabled) moveZone(zm.dataset.zmove, zm.dataset.ctrl); return; }
   const zd = t.closest('[data-zdel]');
   if(zd){ deleteZone(zd.dataset.zdel); return; }
   const del = t.closest('[data-del]');
@@ -958,7 +969,6 @@ $('#side').addEventListener('input', e=>{
 });
 $('#side').addEventListener('change', e=>{
   const t = e.target;
-  if(t.dataset.zctrl !== undefined){ moveZone(t.dataset.zctrl, t.value || null); return; }
   if(t.dataset.activezone !== undefined){ activeZone = t.value || null; renderAll(); return; }
   if(t.dataset.hzone){
     const h = findItem(t.dataset.hzone);
