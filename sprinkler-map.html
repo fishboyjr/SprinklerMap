@@ -85,7 +85,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 </head>
 <body>
 
-<div id="splash" class="overlay" hidden>
+<div id="splash" class="overlay">
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
@@ -156,7 +156,7 @@ const KIND = {
 const HEAD_TYPES = ['unknown','spray','rotor','drip','bubbler','other'];
 const HEAD_LABEL = {unknown:'Not sure',spray:'Spray',rotor:'Rotor',drip:'Drip',bubbler:'Bubbler',other:'Other'};
 
-let doc = newDoc();
+let doc;
 let mode = 'select', sel = null, activeZone = null, dirty = false, zoom = 1;
 let measurePts = [], lastDist = null, drag = null, suppressClick = false;
 let pendingSource = 'upload', printMode = 'yard', saveTimer = null;
@@ -604,6 +604,7 @@ $('#side').addEventListener('change', e=>{
 });
 
 // boot
+doc = newDoc();
 renderAll();
 </script>
 </body>
