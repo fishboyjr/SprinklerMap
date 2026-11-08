@@ -105,7 +105,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   html,body{height:auto;overflow:visible;display:block}
   body>*:not(#printArea){display:none!important}
   #printArea{display:block!important}
-  @page{size:letter;margin:.5in}
+  @page{size:11in 8.5in;margin:.4in}
   .sheet{page-break-after:always;break-after:page}
   .sheet:last-child{page-break-after:auto;break-after:auto}
   .mk{box-shadow:none}
@@ -118,7 +118,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.8</small>
+    <small>Tap anywhere to continue · v1.9</small>
   </div>
 </div>
 
@@ -161,7 +161,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 
 <header>
   <div class="topbar">
-    <span class="title">Sprinkler Map<span class="ver">v1.8</span></span>
+    <span class="title">Sprinkler Map<span class="ver">v1.9</span></span>
     <button id="bUndo" disabled>Undo</button>
     <button id="bNew">New</button>
     <button id="bOpen">Open</button>
@@ -705,7 +705,7 @@ function overviewSheetHTML(s, date, img){
   const eqHalf = Math.ceil(eqRows.length / 2);
   const eqCol1 = eqRows.slice(0, eqHalf).join('');
   const eqCol2 = eqRows.slice(eqHalf).join('');
-  return `<section class="sheet">
+  return `<section class="sheet ov">
     <div class="phead">
       <div class="ptitle">${esc(doc.name || 'Sprinkler Map')}</div>
       <div class="psub">${esc(s.title)} · Last updated ${date}</div>
@@ -756,7 +756,33 @@ function printSheets(){
   area.innerHTML = sheets.map(s=>sheetHTML(s, date, doc.image)).join('');
   // wait until every picture has decoded, or the print can come out blank
   const waits = [...area.querySelectorAll('img')].map(i => (i.decode ? i.decode() : Promise.resolve()).catch(()=>{}));
-  Promise.all(waits).then(()=>setTimeout(()=>window.print(), 300));
+  Promise.all(waits).then(()=>{ fitPictures(area); setTimeout(()=>window.print(), 300); });
+}
+
+// size the Overview picture as large as possible: the full landscape page width,
+// and whatever height is left after the title, legend and note are measured
+function fitPictures(area){
+  const IN = 96;
+  const pageW = 10.2 * IN, pageH = 7.7 * IN; // letter landscape less 0.4in margins
+  const saved = area.style.cssText;
+  area.style.cssText = `display:block;position:absolute;left:-10000px;top:0;width:${pageW}px`;
+  area.querySelectorAll('.sheet.ov').forEach(sheet => {
+    const img = sheet.querySelector('.pstage img');
+    if(!img || !img.naturalWidth) return;
+    let other = 0;
+    [...sheet.children].forEach(el => {
+      if(el.classList.contains('pwrap')) return;
+      const cs = getComputedStyle(el);
+      other += el.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+    });
+    const maxH = pageH - other - 14; // 14px for the picture block's own margins
+    const s = Math.min(pageW / img.naturalWidth, maxH / img.naturalHeight);
+    img.style.maxWidth = 'none';
+    img.style.maxHeight = 'none';
+    img.style.width = Math.floor(img.naturalWidth * s) + 'px';
+    img.style.height = Math.floor(img.naturalHeight * s) + 'px';
+  });
+  area.style.cssText = saved;
 }
 
 /* ---------- events ---------- */
