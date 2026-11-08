@@ -118,7 +118,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.10</small>
+    <small>Tap anywhere to continue · v1.11</small>
   </div>
 </div>
 
@@ -161,7 +161,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 
 <header>
   <div class="topbar">
-    <span class="title">Sprinkler Map<span class="ver">v1.10</span></span>
+    <span class="title">Sprinkler Map<span class="ver">v1.11</span></span>
     <button id="bUndo" disabled>Undo</button>
     <button id="bNew">New</button>
     <button id="bOpen">Open</button>
@@ -764,7 +764,7 @@ function printSheets(){
 function fitPictures(area){
   const IN = 96;
   // letter landscape less 0.5in margins, with extra room kept for the browser's own header and footer
-  const pageW = 10.0 * IN, pageH = 6.9 * IN;
+  const pageW = 9.6 * IN, pageH = 6.0 * IN;
   const saved = area.style.cssText;
   area.style.cssText = `display:block;position:absolute;left:-10000px;top:0;width:${pageW}px`;
   area.querySelectorAll('.sheet.ov').forEach(sheet => {
