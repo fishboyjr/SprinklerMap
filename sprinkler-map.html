@@ -36,7 +36,7 @@ main{flex:1;min-height:0;width:100%;display:flex;flex-direction:row;align-items:
 #zoomCtl button{width:42px;min-height:42px;padding:0;font-size:22px;line-height:1;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 #zoomLbl{font-size:11px;color:var(--muted)}
 .mk{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);touch-action:none;cursor:pointer;user-select:none;pointer-events:auto;white-space:nowrap}
-.head{width:24px;height:24px;border-radius:50%;background:#1f6feb}
+.head{min-width:24px;height:24px;padding:0 5px;border-radius:12px;background:#1f6feb;font-size:11px}
 .head.unassigned{background:var(--red)}
 .mk.sel{outline:3px solid #facc15;outline-offset:2px}
 .eq{min-width:30px;height:30px;padding:0 4px;border-radius:6px;font-size:11px}
@@ -54,7 +54,7 @@ main{flex:1;min-height:0;width:100%;display:flex;flex-direction:row;align-items:
 .zrow{display:flex;align-items:center;gap:6px;padding:4px;border-radius:8px;border:1px solid transparent}
 .zrow.on{border-color:var(--accent);background:#f0f6ff}
 .zrow input{flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;font:inherit}
-.chip{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;color:#fff;font-weight:700;font-size:12px;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.chip{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 5px;border-radius:13px;color:#fff;font-weight:700;font-size:12px;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
 .cnt{font-size:13px;color:var(--muted);min-width:18px;text-align:right}
 .eqlist{display:flex;flex-direction:column;gap:4px}
 .eqrow{text-align:left;width:100%}
@@ -107,7 +107,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.4</small>
+    <small>Tap anywhere to continue · v1.5</small>
   </div>
 </div>
 
@@ -150,7 +150,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 
 <header>
   <div class="topbar">
-    <span class="title">Sprinkler Map<span class="ver">v1.4</span></span>
+    <span class="title">Sprinkler Map<span class="ver">v1.5</span></span>
     <button id="bUndo" disabled>Undo</button>
     <button id="bNew">New</button>
     <button id="bOpen">Open</button>
@@ -214,14 +214,18 @@ const clamp = v => Math.min(1, Math.max(0, v));
 const uid = () => Math.random().toString(36).slice(2, 9);
 const zoneById = id => doc.zones.find(z => z.id === id);
 const findItem = id => doc.heads.find(h => h.id === id) || doc.equipment.find(q => q.id === id);
-const zoneLabel = z => z ? `Zone ${z.num}${z.name ? ' – ' + z.name : ''}` : 'no zone';
+const controllers = () => doc.equipment.filter(q => q.kind === 'controller');
+const ctrlCode = id => (doc.equipment.find(q => q.id === id && q.kind === 'controller') || {}).code || '';
+// with more than one controller, zones show as "1-C1", "1-C2"; with one controller just the number
+const zoneTag = z => (controllers().length > 1 && ctrlCode(z.ctrl)) ? `${z.num}-${ctrlCode(z.ctrl)}` : `${z.num}`;
+const zoneLabel = z => z ? `Zone ${zoneTag(z)}${z.name ? ' – ' + z.name : ''}` : 'no zone';
 const isHead = it => doc.heads.includes(it);
 // heads are edited on the Sprinkler Heads tab, equipment on the Equipment tab
 const canEdit = it => it && ((tab === 'heads' && isHead(it)) || (tab === 'equip' && !isHead(it)));
 
 function newDoc(){
   return {
-    app:'SprinkMap', version:1, name:'', mapSource:null, image:null, mapW:0, mapH:0,
+    app:'SprinkMap', version:1, name:'', mapSource:null, image:null, mapW:0, mapH:0, numbering:'per',
     scale:null,
     zones: PALETTE.slice(0,6).map((c,i)=>({id:uid(), num:i+1, name:'', color:c})),
     heads:[], equipment:[], updated:new Date().toISOString()
@@ -258,7 +262,7 @@ function pt(e){
 
 /* ---------- undo ---------- */
 function snap(){
-  return JSON.stringify({zones:doc.zones, heads:doc.heads, equipment:doc.equipment, scale:doc.scale});
+  return JSON.stringify({zones:doc.zones, heads:doc.heads, equipment:doc.equipment, scale:doc.scale, numbering:doc.numbering});
 }
 function checkpoint(s){
   undoStack.push(s ?? snap());
@@ -270,6 +274,7 @@ function undo(){
   if(!undoStack.length){ flash('Nothing to undo.'); return; }
   const prev = JSON.parse(undoStack.pop());
   doc.zones = prev.zones; doc.heads = prev.heads; doc.equipment = prev.equipment; doc.scale = prev.scale;
+  doc.numbering = prev.numbering || 'per';
   if(sel && !findItem(sel)) sel = null;
   if(activeZone && !zoneById(activeZone)) activeZone = doc.zones[0]?.id ?? null;
   touch();
@@ -308,7 +313,7 @@ function markersHTML(zoneFilter, forPrint){
   for(const h of doc.heads){
     if(zoneFilter !== undefined && h.zone !== zoneFilter) continue;
     const z = zoneById(h.zone);
-    out += `<div class="mk head${z?'':' unassigned'}${h.id===s?' sel':''}" data-id="${h.id}" style="left:${h.x*100}%;top:${h.y*100}%${z?';background:'+z.color:''}">${z?z.num:'?'}</div>`;
+    out += `<div class="mk head${z?'':' unassigned'}${h.id===s?' sel':''}" data-id="${h.id}" style="left:${h.x*100}%;top:${h.y*100}%${z?';background:'+z.color:''}">${z?zoneTag(z):'?'}</div>`;
   }
   for(const q of doc.equipment){
     out += `<div class="mk eq eq-${q.kind}${q.id===s?' sel':''}" data-id="${q.id}" style="left:${q.x*100}%;top:${q.y*100}%">${esc(q.code)}</div>`;
@@ -327,8 +332,8 @@ function renderMap(){
 }
 
 /* ---------- side panels (one per tab) ---------- */
-function zoneRowsHTML(){
-  return doc.zones.map(z=>{
+function zoneRowHTML(z){
+  {
     const n = doc.heads.filter(h=>h.zone===z.id).length;
     return `<div class="zrow${z.id===activeZone?' on':''}" data-zrow="${z.id}">
       <span class="chip" style="background:${z.color}">${z.num}</span>
@@ -336,11 +341,17 @@ function zoneRowsHTML(){
       <span class="cnt">${n}</span>
       <button class="danger sm" data-zdel="${z.id}" aria-label="Delete zone ${z.num}">✕</button>
     </div>`;
-  }).join('');
+  }
 }
 
+// zone choices grouped by controller
 function zoneOptionsHTML(selectedId){
-  return doc.zones.map(z=>`<option value="${z.id}"${z.id===selectedId?' selected':''}>${esc(zoneLabel(z))}</option>`).join('');
+  const opt = z => `<option value="${z.id}"${z.id===selectedId?' selected':''}>${esc(zoneLabel(z))}</option>`;
+  const ctrls = controllers();
+  let html = ctrls.map(c=>`<optgroup label="${esc(c.code)}">${doc.zones.filter(z=>z.ctrl===c.id).map(opt).join('')}</optgroup>`).join('');
+  const orphans = doc.zones.filter(z=>!z.ctrl || !ctrls.some(c=>c.id===z.ctrl));
+  if(orphans.length) html += `<optgroup label="No controller">${orphans.map(opt).join('')}</optgroup>`;
+  return html;
 }
 
 function placeButton(m, idleLabel, activeLabel){
@@ -373,13 +384,28 @@ function mapSide(){
 }
 
 function zonesSide(){
-  return `
+  const ctrls = controllers();
+  const orphans = doc.zones.filter(z=>!z.ctrl || !ctrls.some(c=>c.id===z.ctrl));
+  const group = (title, ctrlId, zs, hint) => `
     <section>
-      <h3>Zones</h3>
-      <p class="muted">Tap a zone to make it active. Heads you add go to the active zone. Names are optional.</p>
-      ${zoneRowsHTML() || '<p class="muted">No zones yet.</p>'}
-      <button data-zadd>+ Add zone</button>
+      <h3>${esc(title)}</h3>
+      ${hint ? `<p class="muted">${hint}</p>` : ''}
+      ${zs.map(zoneRowHTML).join('') || '<p class="muted">No zones yet.</p>'}
+      <button data-zadd="${ctrlId || ''}">+ Add zone${ctrlId ? ' to ' + esc(ctrlCode(ctrlId)) : ''}</button>
     </section>`;
+  let html = `
+    <section>
+      <h3>Numbering</h3>
+      <label class="radio"><input type="radio" name="numb" value="per" ${doc.numbering==='cont'?'':'checked'}> Start at 1 for each controller</label>
+      <label class="radio"><input type="radio" name="numb" value="cont" ${doc.numbering==='cont'?'checked':''}> Continue with the next available number</label>
+    </section>`;
+  if(!ctrls.length){
+    html += group('Zones', null, orphans, 'Add a controller on the Equipment tab. Zones then group under it. Tap a zone to make it active; names are optional.');
+  } else {
+    html += ctrls.map(c=>group(`${c.code} · ${c.name}`, c.id, doc.zones.filter(z=>z.ctrl===c.id), 'Tap a zone to make it active. Names are optional.')).join('');
+    if(orphans.length) html += group('No controller', null, orphans, 'These zones are not on a controller yet.');
+  }
+  return html;
 }
 
 function headsSide(){
@@ -387,7 +413,7 @@ function headsSide(){
   const list = doc.heads.map(h=>{
     const z = zoneById(h.zone);
     const name = [h.company, h.model].filter(Boolean).join(' ');
-    return `<button class="eqrow${h.id===sel?' on':''}" data-select="${h.id}">${z ? 'Zone '+z.num : 'Needs zone'}${name ? ' · '+esc(name) : ''}</button>`;
+    return `<button class="eqrow${h.id===sel?' on':''}" data-select="${h.id}">${z ? 'Zone '+zoneTag(z) : 'Needs zone'}${name ? ' · '+esc(name) : ''}</button>`;
   }).join('') || '<p class="muted">No heads yet. Tap Add heads, then tap the map.</p>';
 
   let editor = '<p class="muted">Tap a head in the list or on the map to edit it.</p>';
@@ -417,7 +443,7 @@ function headsSide(){
 
 function equipSide(){
   const buttons = Object.keys(KIND).map(k=>placeButton(k, 'Add ' + KIND[k].name.toLowerCase(), 'Stop adding ' + KIND[k].name.toLowerCase())).join('');
-  const rows = doc.equipment.map(q=>`<button class="eqrow${q.id===sel?' on':''}" data-select="${q.id}">${esc(q.code)} · ${esc(q.name)}</button>`).join('')
+  const rows = doc.equipment.map(q=>`<button class="eqrow${q.id===sel?' on':''}" data-select="${q.id}">${esc(q.code)} · ${esc(q.name)}${q.kind==='controller' ? ' · ' + doc.zones.filter(z=>z.ctrl===q.id).length + ' zones' : ''}</button>`).join('')
     || '<p class="muted">No equipment yet.</p>';
   let editor = '<p class="muted">Tap an item in the list or on the map to edit it.</p>';
   const it = sel && findItem(sel);
@@ -492,15 +518,37 @@ function togglePlace(m){
 }
 
 /* ---------- zones & items ---------- */
-function addZone(){
-  checkpoint();
+// new zone on a controller (ctrlId null = no controller yet)
+// numbering: per controller starts at 1; "cont" continues from the highest number in use
+function makeZone(ctrlId){
   const used = new Set(doc.zones.map(z=>z.color));
   const color = PALETTE.find(c=>!used.has(c)) || PALETTE[doc.zones.length % PALETTE.length];
-  const num = Math.max(0, ...doc.zones.map(z=>z.num)) + 1;
-  const z = {id:uid(), num, name:'', color};
+  const group = doc.numbering==='cont' ? doc.zones : doc.zones.filter(z=>(z.ctrl||null)===(ctrlId||null));
+  const num = Math.max(0, ...group.map(z=>z.num)) + 1;
+  const z = {id:uid(), num, name:'', color, ctrl: ctrlId || null};
   doc.zones.push(z);
+  return z;
+}
+
+function addZone(ctrlId){
+  checkpoint();
+  const z = makeZone(ctrlId);
   activeZone = z.id;
   touch(); renderAll();
+}
+
+// renumber all zones when the numbering option changes
+function renumberZones(){
+  const ctrls = controllers();
+  const groups = ctrls.map(c=>doc.zones.filter(z=>z.ctrl===c.id));
+  const orphans = doc.zones.filter(z=>!z.ctrl || !ctrls.some(c=>c.id===z.ctrl));
+  if(doc.numbering==='cont'){
+    const all = [].concat(...groups, orphans);
+    all.forEach((z,i)=>{ z.num = i+1; });
+  } else {
+    groups.forEach(g=>g.forEach((z,i)=>{ z.num = i+1; }));
+    orphans.forEach((z,i)=>{ z.num = i+1; });
+  }
 }
 
 function deleteZone(id){
@@ -526,6 +574,12 @@ function addItem(kind, p){
     const n = Math.max(0, ...nums) + 1;
     it = {id:uid(), kind, code:pre+n, name:KIND[kind].name, notes:'', x:p.x, y:p.y};
     doc.equipment.push(it);
+    if(kind==='controller'){
+      // first controller takes over any zones not yet on a controller; later ones start with 6 zones
+      const orphans = doc.zones.filter(z=>!z.ctrl);
+      if(orphans.length && controllers().length===1) orphans.forEach(z=>{ z.ctrl = it.id; });
+      else for(let i=0;i<6;i++) makeZone(it.id);
+    }
   }
   sel = it.id;
   touch(); renderAll();
@@ -535,8 +589,16 @@ function deleteItem(id){
   const it = findItem(id);
   if(!it) return;
   const label = isHead(it) ? 'sprinkler head' : KIND[it.kind].name.toLowerCase();
-  if(!confirm(`Delete this ${label}?`)) return;
+  const zoneCount = (!isHead(it) && it.kind==='controller') ? doc.zones.filter(z=>z.ctrl===id).length : 0;
+  const extra = zoneCount ? ` Its ${zoneCount} zone(s) will be removed, and their heads will need a zone.` : '';
+  if(!confirm(`Delete this ${label}?${extra}`)) return;
   checkpoint();
+  if(zoneCount){
+    const gone = new Set(doc.zones.filter(z=>z.ctrl===id).map(z=>z.id));
+    doc.heads.forEach(h=>{ if(gone.has(h.zone)) h.zone = null; });
+    doc.zones = doc.zones.filter(z=>!gone.has(z.id));
+    if(gone.has(activeZone)) activeZone = doc.zones[0]?.id ?? null;
+  }
   doc.heads = doc.heads.filter(h=>h.id!==id);
   doc.equipment = doc.equipment.filter(q=>q.id!==id);
   if(sel===id) sel = null;
@@ -605,7 +667,7 @@ function afterLoad(){
 /* ---------- printing ---------- */
 function overviewSheetHTML(s, date, img){
   const unassigned = doc.heads.filter(h=>!h.zone).length;
-  const zoneItems = doc.zones.map(z=>`<div class="row2"><span class="chip" style="background:${z.color}">${z.num}</span><span>${esc(zoneLabel(z))}</span></div>`).join('')
+  const zoneItems = doc.zones.map(z=>`<div class="row2"><span class="chip" style="background:${z.color}">${esc(zoneTag(z))}</span><span>${esc(zoneLabel(z))}</span></div>`).join('')
     + (unassigned ? `<div class="row2"><span class="chip" style="background:#dc2626">?</span><span>Needs assignment (${unassigned} head${unassigned===1?'':'s'})</span></div>` : '');
   const eqItems = doc.equipment.map(q=>`<div class="row2"><span class="code">${esc(q.code)}</span><span>${esc(KIND[q.kind].name)}${q.name && q.name!==KIND[q.kind].name ? ' – '+esc(q.name) : ''}</span></div>`).join('');
   return `<section class="sheet">
@@ -628,9 +690,9 @@ function sheetHTML(s, date, img){
   const heads = doc.heads.filter(h => s.zone===undefined || h.zone===s.zone);
   const unassigned = doc.heads.filter(h=>!h.zone).length;
   const zoneRows = s.zone===undefined
-    ? doc.zones.map(z=>`<tr><td><span class="chip" style="background:${z.color}">${z.num}</span></td><td>${esc(z.name)||'—'}</td><td>${doc.heads.filter(h=>h.zone===z.id).length}</td></tr>`).join('')
+    ? doc.zones.map(z=>`<tr><td><span class="chip" style="background:${z.color}">${esc(zoneTag(z))}</span></td><td>${esc(z.name)||'—'}</td><td>${doc.heads.filter(h=>h.zone===z.id).length}</td></tr>`).join('')
       + (unassigned ? `<tr><td>?</td><td>Needs assignment</td><td>${unassigned}</td></tr>` : '')
-    : `<tr><td>${zoneById(s.zone).num}</td><td>${esc(zoneById(s.zone).name)||'—'}</td><td>${heads.length}</td></tr>`;
+    : `<tr><td>${esc(zoneTag(zoneById(s.zone)))}</td><td>${esc(zoneById(s.zone).name)||'—'}</td><td>${heads.length}</td></tr>`;
   const eq = doc.equipment.map(q=>`<tr><td>${esc(q.code)}</td><td>${esc(KIND[q.kind].name)}</td><td>${esc(q.name)}</td><td>${esc(q.notes)}</td></tr>`).join('');
   return `<section class="sheet">
     <div class="phead">
@@ -832,7 +894,8 @@ $('#side').addEventListener('click', e=>{
   const pl = t.closest('[data-place]');
   if(pl){ togglePlace(pl.dataset.place); return; }
   if(t.closest('[data-change-pic]')){ showSetup(); return; }
-  if(t.closest('[data-zadd]')){ addZone(); return; }
+  const za = t.closest('[data-zadd]');
+  if(za){ addZone(za.dataset.zadd || null); return; }
   const zd = t.closest('[data-zdel]');
   if(zd){ deleteZone(zd.dataset.zdel); return; }
   const del = t.closest('[data-del]');
@@ -873,6 +936,13 @@ $('#side').addEventListener('change', e=>{
   if(t.dataset.htype){
     const h = findItem(t.dataset.htype);
     if(h){ checkpoint(); h.type = t.value; touch(); }
+    return;
+  }
+  if(t.name==='numb'){
+    checkpoint();
+    doc.numbering = t.value;
+    renumberZones();
+    touch(); renderAll();
   }
 });
 
