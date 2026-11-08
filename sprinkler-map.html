@@ -95,7 +95,8 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 .psub{font-size:12px;color:#555}
 .pwrap{text-align:center;margin:6px 0}
 .pstage{display:inline-block;position:relative;max-width:100%}
-.pstage img{display:block;max-height:5.8in;max-width:100%;width:auto;height:auto}
+.pstage img{display:block;max-height:4.6in;max-width:100%;width:auto;height:auto}
+.pwrap{break-inside:avoid;page-break-inside:avoid}
 .pstage .layer{position:absolute;inset:0}
 .ptable{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
 .ptable th,.ptable td{border-bottom:1px solid #ccc;padding:3px 4px;text-align:left;vertical-align:top}
@@ -117,7 +118,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.7</small>
+    <small>Tap anywhere to continue · v1.8</small>
   </div>
 </div>
 
@@ -160,7 +161,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 
 <header>
   <div class="topbar">
-    <span class="title">Sprinkler Map<span class="ver">v1.7</span></span>
+    <span class="title">Sprinkler Map<span class="ver">v1.8</span></span>
     <button id="bUndo" disabled>Undo</button>
     <button id="bNew">New</button>
     <button id="bOpen">Open</button>
@@ -751,8 +752,11 @@ function printSheets(){
   const sheets = [{title:'Overview', zone:undefined, overview:true}];
   if(printMode==='zones') doc.zones.forEach(z=>sheets.push({title:zoneLabel(z), zone:z.id}));
   const date = new Date(doc.updated).toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
-  $('#printArea').innerHTML = sheets.map(s=>sheetHTML(s, date, doc.image)).join('');
-  setTimeout(()=>window.print(), 300);
+  const area = $('#printArea');
+  area.innerHTML = sheets.map(s=>sheetHTML(s, date, doc.image)).join('');
+  // wait until every picture has decoded, or the print can come out blank
+  const waits = [...area.querySelectorAll('img')].map(i => (i.decode ? i.decode() : Promise.resolve()).catch(()=>{}));
+  Promise.all(waits).then(()=>setTimeout(()=>window.print(), 300));
 }
 
 /* ---------- events ---------- */
