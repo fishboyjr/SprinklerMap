@@ -105,7 +105,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   html,body{height:auto;overflow:visible;display:block}
   body>*:not(#printArea){display:none!important}
   #printArea{display:block!important}
-  @page{size:11in 8.5in;margin:.4in}
+  @page{size:11in 8.5in;margin:.5in}
   .sheet{page-break-after:always;break-after:page}
   .sheet:last-child{page-break-after:auto;break-after:auto}
   .mk{box-shadow:none}
@@ -118,7 +118,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.9</small>
+    <small>Tap anywhere to continue · v1.10</small>
   </div>
 </div>
 
@@ -161,7 +161,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 
 <header>
   <div class="topbar">
-    <span class="title">Sprinkler Map<span class="ver">v1.9</span></span>
+    <span class="title">Sprinkler Map<span class="ver">v1.10</span></span>
     <button id="bUndo" disabled>Undo</button>
     <button id="bNew">New</button>
     <button id="bOpen">Open</button>
@@ -720,7 +720,7 @@ function overviewSheetHTML(s, date, img){
         <h4>Equipment</h4>
         ${eqCol1 || '<div>None marked</div>'}
       </div>
-      ${eqCol2 ? `<div class="lg-col">${eqCol2}</div>` : ''}
+      ${eqCol2 ? `<div class="lg-col"><h4 style="visibility:hidden" aria-hidden="true">Equipment</h4>${eqCol2}</div>` : ''}
     </div>
     <p class="disc">For reference only. Check with a licensed irrigation contractor or qualified professional before sprinkler, plumbing, or winterization work.</p>
   </section>`;
@@ -763,7 +763,8 @@ function printSheets(){
 // and whatever height is left after the title, legend and note are measured
 function fitPictures(area){
   const IN = 96;
-  const pageW = 10.2 * IN, pageH = 7.7 * IN; // letter landscape less 0.4in margins
+  // letter landscape less 0.5in margins, with extra room kept for the browser's own header and footer
+  const pageW = 10.0 * IN, pageH = 6.9 * IN;
   const saved = area.style.cssText;
   area.style.cssText = `display:block;position:absolute;left:-10000px;top:0;width:${pageW}px`;
   area.querySelectorAll('.sheet.ov').forEach(sheet => {
