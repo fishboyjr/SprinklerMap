@@ -74,8 +74,10 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 #cropBox{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;max-height:55vh;overflow:hidden;border:1px solid var(--line);border-radius:8px}
 #cropImg{display:block;max-width:100%;max-height:55vh;width:auto;height:auto;pointer-events:none;margin:0 auto}
 #cropRect{position:absolute;border:2px dashed #facc15;background:rgba(250,204,21,.18);pointer-events:none}
-#satStage{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;max-height:55vh;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:#eee;min-height:120px}
-#satStage canvas{display:block;width:100%;height:auto}
+#satStage{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;width:fit-content;max-width:100%;margin:0 auto;border:1px solid var(--line);border-radius:8px;background:#eee}
+#satStage canvas{display:block;max-width:100%;max-height:55vh;width:auto;height:auto}
+.satctl{display:flex;gap:8px;flex-wrap:wrap}
+.satctl button{flex:1;min-width:110px}
 #satRect{position:absolute;border:2px dashed #facc15;background:rgba(250,204,21,.18);pointer-events:none}
 .satform{display:flex;gap:8px}
 .satform input{flex:1;min-width:0;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px}
@@ -123,7 +125,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.12</small>
+    <small>Tap anywhere to continue · v1.13</small>
   </div>
 </div>
 
@@ -153,6 +155,13 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
     </form>
     <p id="satStatus" class="muted"></p>
     <div id="satStage"></div>
+    <div class="satctl">
+      <button id="satZoomOut">Zoom out</button>
+      <button id="satZoomIn">Zoom in</button>
+      <button id="satRotL">Rotate left</button>
+      <button id="satRotR">Rotate right</button>
+    </div>
+    <p class="muted">Zoom and rotate first, then draw the box. Changing the view clears the box.</p>
     <p class="muted">Imagery: Esri, Vantor, Earthstar Geographics, and the GIS User Community.</p>
     <button id="satUse" class="primary big" disabled>Use this box</button>
     <button id="satBack" class="big">Back</button>
@@ -1064,6 +1073,8 @@ document.addEventListener('touchmove', e=>{
 /* ---------- satellite picture (Esri World Imagery) ---------- */
 // The picture is built from map tiles inside the app, so the box is cut from the app's own copy.
 const SAT_ZOOM = 19, SAT_GRID = 4, SAT_PX = 1024;
+// satBase: the downloaded tiles; satCanvas: the current view (zoomed and rotated) that the box is drawn on
+let satBase = null, satAddr = null, satZoom = 1, satRot = 0;
 let satCanvas = null, satTainted = false, satSel = null, satDragging = false;
 
 function loadTile(url){
@@ -1092,6 +1103,7 @@ async function buildSatPicture(lat, lon){
   ctx.fillStyle = '#ddd'; ctx.fillRect(0, 0, SAT_PX, SAT_PX);
   let tainted = false, loaded = 0;
   const jobs = [];
+  const addr = { x: px - tx0 * 256, y: py - ty0 * 256 };
   for(let i = 0; i < SAT_GRID; i++) for(let j = 0; j < SAT_GRID; j++){
     const url = `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${SAT_ZOOM}/${ty0 + j}/${tx0 + i}`;
     jobs.push(loadTile(url).then(r => {
@@ -1103,11 +1115,11 @@ async function buildSatPicture(lat, lon){
   }
   await Promise.all(jobs);
   if(!loaded) throw new Error('The satellite tiles did not load. Check your connection and try again.');
-  return { canvas: c, tainted };
+  return { canvas: c, tainted, addr };
 }
 
 function openSat(){
-  satCanvas = null; satSel = null;
+  satCanvas = null; satSel = null; satBase = null;
   $('#satStage').innerHTML = '';
   $('#satStatus').textContent = '';
   $('#satUse').disabled = true;
@@ -1118,20 +1130,50 @@ function openSat(){
 }
 
 function showSatPicture(built){
-  satCanvas = built.canvas; satTainted = built.tainted; satSel = null;
-  const stage = $('#satStage');
-  stage.innerHTML = '';
-  stage.appendChild(built.canvas);
-  const r = document.createElement('div');
-  r.id = 'satRect'; r.hidden = true;
-  stage.appendChild(r);
+  satBase = built.canvas; satAddr = built.addr; satTainted = built.tainted;
+  satZoom = 1; satRot = 0;
+  renderSat();
   if(built.tainted){
     $('#satStatus').textContent = 'This browser will not let this picture be saved. Go back and use a screenshot instead.';
   } else {
-    $('#satStatus').textContent = 'Draw a box around your property, then tap Use this box.';
+    $('#satStatus').textContent = 'Zoom and rotate if needed, then draw a box around your property and tap Use this box.';
   }
+}
+
+// draw the view: the address sits in the middle, turned and zoomed as the user chose
+function renderSat(){
+  if(!satBase) return;
+  const V = 1024;
+  const v = document.createElement('canvas');
+  v.width = V; v.height = V;
+  const ctx = v.getContext('2d');
+  ctx.fillStyle = '#ddd'; ctx.fillRect(0, 0, V, V);
+  ctx.save();
+  ctx.translate(V / 2, V / 2);
+  ctx.rotate(satRot * Math.PI / 180);
+  ctx.scale(satZoom, satZoom);
+  ctx.translate(-satAddr.x, -satAddr.y);
+  ctx.drawImage(satBase, 0, 0);
+  ctx.restore();
+  satCanvas = v; satSel = null; satDragging = false;
+  const stage = $('#satStage');
+  stage.innerHTML = '';
+  stage.appendChild(v);
+  const r = document.createElement('div');
+  r.id = 'satRect'; r.hidden = true;
+  stage.appendChild(r);
   $('#satUse').disabled = true;
 }
+function satChangeView(fn){
+  if(!satBase) return;
+  fn();
+  renderSat();
+  if(!satTainted) $('#satStatus').textContent = 'Draw a box around your property, then tap Use this box.';
+}
+$('#satZoomIn').onclick  = ()=>satChangeView(()=>{ satZoom = Math.min(4, satZoom * 1.5); });
+$('#satZoomOut').onclick = ()=>satChangeView(()=>{ satZoom = Math.max(0.75, satZoom / 1.5); });
+$('#satRotL').onclick    = ()=>satChangeView(()=>{ satRot = (satRot + 270) % 360; });
+$('#satRotR').onclick    = ()=>satChangeView(()=>{ satRot = (satRot + 90) % 360; });
 
 function satPoint(e){
   const r = $('#satStage').getBoundingClientRect();
@@ -1228,7 +1270,7 @@ $('#satUse').onclick = ()=>{
   flash('Picture saved. Next, set the scale.');
 };
 $('#satBack').onclick = ()=>{
-  satCanvas = null; satSel = null;
+  satCanvas = null; satSel = null; satBase = null;
   $('#satStage').innerHTML = '';
   $('#sat').hidden = true;
   $('#setup').hidden = false;
