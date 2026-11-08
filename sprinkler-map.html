@@ -74,6 +74,11 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 #cropBox{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;max-height:55vh;overflow:hidden;border:1px solid var(--line);border-radius:8px}
 #cropImg{display:block;max-width:100%;max-height:55vh;width:auto;height:auto;pointer-events:none;margin:0 auto}
 #cropRect{position:absolute;border:2px dashed #facc15;background:rgba(250,204,21,.18);pointer-events:none}
+#satStage{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;max-height:55vh;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:#eee;min-height:120px}
+#satStage canvas{display:block;width:100%;height:auto}
+#satRect{position:absolute;border:2px dashed #facc15;background:rgba(250,204,21,.18);pointer-events:none}
+.satform{display:flex;gap:8px}
+.satform input{flex:1;min-width:0;padding:8px;font-size:16px;border:1px solid var(--line);border-radius:8px}
 #mapAddr{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;width:100%}
 .legend{display:grid;grid-template-columns:1fr 1.5fr;gap:12px;margin-top:6px;font-size:10px;break-inside:avoid;page-break-inside:avoid;text-align:left}
 .legend.three{grid-template-columns:1fr 1.2fr 1.2fr}
@@ -118,22 +123,39 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.11</small>
+    <small>Tap anywhere to continue · v1.12</small>
   </div>
 </div>
 
 <div id="setup" class="overlay" hidden>
   <div class="card">
     <h2>Choose your map picture</h2>
-    <p>Use a screenshot of your yard from Google Maps or Apple Maps (satellite view works best), or upload your own picture. This app cannot pull the map itself.</p>
+    <p>Get a satellite picture of your yard, or use a screenshot from Google Maps or Apple Maps, or upload your own picture.</p>
     <p class="warn">Privacy: this app does not store your address. Your picture may still show a house number or street label, and the picture is saved inside your file. Crop it first if you don't want that.</p>
     <p id="setupSteps" class="muted">Choose how to get your yard picture.</p>
-    <button class="primary big" data-src="upload">Upload my own picture</button>
+    <button class="primary big" data-src="esri">Satellite picture (draw a box)</button>
+    <button class="big" data-src="upload">Upload my own picture</button>
     <input id="mapAddr" type="text" placeholder="Optional: your address, used only to open the map (not saved)" autocomplete="off">
     <button class="big" data-src="google">Open Google Maps</button>
     <button class="big" data-src="apple">Open Apple Maps</button>
     <button id="btnPick" class="primary big" hidden>Choose screenshot</button>
     <button id="setupCancel" class="big">Cancel</button>
+  </div>
+</div>
+
+<div id="sat" class="overlay" hidden>
+  <div class="card">
+    <h2>Satellite picture</h2>
+    <p class="muted">Type the address, then draw a box around your property. Only the boxed area is saved. The address is sent once to find the location and is not saved.</p>
+    <form id="satForm" class="satform">
+      <input id="satAddr" type="text" placeholder="Street address, city, state" autocomplete="off">
+      <button class="primary" type="submit">Find</button>
+    </form>
+    <p id="satStatus" class="muted"></p>
+    <div id="satStage"></div>
+    <p class="muted">Imagery: Esri, Vantor, Earthstar Geographics, and the GIS User Community.</p>
+    <button id="satUse" class="primary big" disabled>Use this box</button>
+    <button id="satBack" class="big">Back</button>
   </div>
 </div>
 
@@ -722,7 +744,7 @@ function overviewSheetHTML(s, date, img){
       </div>
       ${eqCol2 ? `<div class="lg-col"><h4 style="visibility:hidden" aria-hidden="true">Equipment</h4>${eqCol2}</div>` : ''}
     </div>
-    <p class="disc">For reference only. Check with a licensed irrigation contractor or qualified professional before sprinkler, plumbing, or winterization work.</p>
+    <p class="disc">For reference only. Check with a licensed irrigation contractor or qualified professional before sprinkler, plumbing, or winterization work.${doc.mapSource === 'esri' ? ' Imagery: Esri, Vantor, Earthstar Geographics, and the GIS User Community.' : ''}</p>
   </section>`;
 }
 
@@ -882,6 +904,7 @@ document.querySelectorAll('[data-src]').forEach(b=>{
     const src = b.dataset.src;
     pendingSource = src;
     if(src==='upload'){ $('#fileImg').click(); return; }
+    if(src==='esri'){ openSat(); return; }
     const addr = $('#mapAddr').value.trim();
     const q = encodeURIComponent(addr);
     const isGoogle = src==='google';
@@ -1037,6 +1060,179 @@ document.addEventListener('touchmove', e=>{
   const scrollingInner = (sw && sw.contains(e.target) && sw.scrollTop > 0) || (sd.contains(e.target) && sd.scrollTop > 0);
   if(window.scrollY <= 0 && dy > 0 && !scrollingInner) e.preventDefault();
 }, {passive:false});
+
+/* ---------- satellite picture (Esri World Imagery) ---------- */
+// The picture is built from map tiles inside the app, so the box is cut from the app's own copy.
+const SAT_ZOOM = 19, SAT_GRID = 4, SAT_PX = 1024;
+let satCanvas = null, satTainted = false, satSel = null, satDragging = false;
+
+function loadTile(url){
+  return new Promise(resolve => {
+    const attempt = cors => {
+      const im = new Image();
+      if(cors) im.crossOrigin = 'anonymous';
+      im.onload = () => resolve({ img: im, cors });
+      im.onerror = () => cors ? attempt(false) : resolve(null);
+      im.src = url;
+    };
+    attempt(true);
+  });
+}
+
+async function buildSatPicture(lat, lon){
+  const n = Math.pow(2, SAT_ZOOM);
+  const px = (lon + 180) / 360 * n * 256;
+  const latR = lat * Math.PI / 180;
+  const py = (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n * 256;
+  const half = SAT_GRID / 2;
+  const tx0 = Math.floor(px / 256) - half, ty0 = Math.floor(py / 256) - half;
+  const c = document.createElement('canvas');
+  c.width = SAT_PX; c.height = SAT_PX;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ddd'; ctx.fillRect(0, 0, SAT_PX, SAT_PX);
+  let tainted = false, loaded = 0;
+  const jobs = [];
+  for(let i = 0; i < SAT_GRID; i++) for(let j = 0; j < SAT_GRID; j++){
+    const url = `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${SAT_ZOOM}/${ty0 + j}/${tx0 + i}`;
+    jobs.push(loadTile(url).then(r => {
+      if(!r) return;
+      loaded++;
+      if(!r.cors) tainted = true;
+      ctx.drawImage(r.img, i * 256, j * 256, 256, 256);
+    }));
+  }
+  await Promise.all(jobs);
+  if(!loaded) throw new Error('The satellite tiles did not load. Check your connection and try again.');
+  return { canvas: c, tainted };
+}
+
+function openSat(){
+  satCanvas = null; satSel = null;
+  $('#satStage').innerHTML = '';
+  $('#satStatus').textContent = '';
+  $('#satUse').disabled = true;
+  $('#satAddr').value = '';
+  $('#setup').hidden = true;
+  $('#sat').hidden = false;
+  $('#satAddr').focus();
+}
+
+function showSatPicture(built){
+  satCanvas = built.canvas; satTainted = built.tainted; satSel = null;
+  const stage = $('#satStage');
+  stage.innerHTML = '';
+  stage.appendChild(built.canvas);
+  const r = document.createElement('div');
+  r.id = 'satRect'; r.hidden = true;
+  stage.appendChild(r);
+  if(built.tainted){
+    $('#satStatus').textContent = 'This browser will not let this picture be saved. Go back and use a screenshot instead.';
+  } else {
+    $('#satStatus').textContent = 'Draw a box around your property, then tap Use this box.';
+  }
+  $('#satUse').disabled = true;
+}
+
+function satPoint(e){
+  const r = $('#satStage').getBoundingClientRect();
+  return {x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height)};
+}
+function drawSatRect(){
+  const el = $('#satRect');
+  if(!el || !satSel){ if(el) el.hidden = true; return; }
+  el.hidden = false;
+  const x = Math.min(satSel.x0, satSel.x1), y = Math.min(satSel.y0, satSel.y1);
+  el.style.left = (x*100)+'%'; el.style.top = (y*100)+'%';
+  el.style.width = (Math.abs(satSel.x1-satSel.x0)*100)+'%';
+  el.style.height = (Math.abs(satSel.y1-satSel.y0)*100)+'%';
+}
+$('#satStage').addEventListener('pointerdown', e=>{
+  if(!satCanvas || satTainted) return;
+  e.preventDefault();
+  const p = satPoint(e);
+  satDragging = true;
+  satSel = {x0:p.x, y0:p.y, x1:p.x, y1:p.y};
+  $('#satUse').disabled = true;
+  drawSatRect();
+  try{ $('#satStage').setPointerCapture(e.pointerId); }catch(_){}
+});
+$('#satStage').addEventListener('pointermove', e=>{
+  if(!satDragging) return;
+  const p = satPoint(e);
+  satSel.x1 = p.x; satSel.y1 = p.y;
+  drawSatRect();
+});
+function endSatDrag(){
+  if(!satDragging) return;
+  satDragging = false;
+  const big = satSel && Math.abs(satSel.x1-satSel.x0) >= 0.05 && Math.abs(satSel.y1-satSel.y0) >= 0.05;
+  $('#satUse').disabled = !big;
+}
+$('#satStage').addEventListener('pointerup', endSatDrag);
+$('#satStage').addEventListener('pointercancel', endSatDrag);
+
+async function satFind(e){
+  e.preventDefault();
+  const q = $('#satAddr').value.trim();
+  if(!q){ $('#satStatus').textContent = 'Type an address first.'; return; }
+  $('#satStatus').textContent = 'Finding the address...';
+  $('#satUse').disabled = true;
+  let lat, lon;
+  try{
+    const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(q));
+    const data = await res.json();
+    if(!data.length) throw new Error('not found');
+    lat = parseFloat(data[0].lat); lon = parseFloat(data[0].lon);
+  }catch(err){
+    $('#satStatus').textContent = 'Could not find that address. Try adding the city and state.';
+    return;
+  }
+  $('#satAddr').value = '';
+  $('#satStatus').textContent = 'Loading the satellite picture...';
+  try{
+    showSatPicture(await buildSatPicture(lat, lon));
+  }catch(err){
+    $('#satStatus').textContent = err.message;
+  }
+}
+$('#satForm').addEventListener('submit', satFind);
+
+$('#satUse').onclick = ()=>{
+  if(!satCanvas || !satSel) return;
+  const W = satCanvas.width, H = satCanvas.height;
+  const x0 = Math.min(satSel.x0, satSel.x1), x1 = Math.max(satSel.x0, satSel.x1);
+  const y0 = Math.min(satSel.y0, satSel.y1), y1 = Math.max(satSel.y0, satSel.y1);
+  const sx = Math.round(x0*W), sy = Math.round(y0*H);
+  const sw = Math.round((x1-x0)*W), sh = Math.round((y1-y0)*H);
+  const c = document.createElement('canvas');
+  c.width = sw; c.height = sh;
+  c.getContext('2d').drawImage(satCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+  let url;
+  try{
+    url = c.toDataURL('image/jpeg', 0.9);
+  }catch(err){
+    $('#satStatus').textContent = 'This browser will not let this picture be saved. Go back and use a screenshot instead.';
+    return;
+  }
+  doc.image = url;
+  doc.mapW = sw; doc.mapH = sh;
+  doc.mapSource = 'esri';
+  doc.scale = null;
+  touch();
+  satCanvas = null; satSel = null;
+  $('#satStage').innerHTML = '';
+  $('#sat').hidden = true;
+  mode = 'select';
+  zoom = 1;
+  renderAll();
+  flash('Picture saved. Next, set the scale.');
+};
+$('#satBack').onclick = ()=>{
+  satCanvas = null; satSel = null;
+  $('#satStage').innerHTML = '';
+  $('#sat').hidden = true;
+  $('#setup').hidden = false;
+};
 
 // crop step: draw a box around the property before saving the picture
 let cropSrc = null, cropSource = null, cropSel = null, cropDragging = false;
