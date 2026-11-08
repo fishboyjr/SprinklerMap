@@ -127,7 +127,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.14</small>
+    <small>Tap anywhere to continue · v1.15</small>
   </div>
 </div>
 
@@ -161,8 +161,6 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
       <div class="satctl">
         <button id="satZoomOut">Zoom out</button>
         <button id="satZoomIn">Zoom in</button>
-        <button id="satRotL">Rotate left</button>
-        <button id="satRotR">Rotate right</button>
       </div>
       <button id="satDraw" class="primary big">This view shows my yard. Draw the box</button>
     </div>
@@ -1158,12 +1156,13 @@ function showSatPicture(built){
 // view mode: move, zoom and rotate the map; box mode: the view is fixed and the box is drawn
 function satEnterView(){
   satMode = 'view'; satCanvas = satView; satSel = null;
+  satPtrs.clear(); satGesture = null; satPan = null;
   $('#satRect').hidden = true;
   $('#satCross').hidden = false;
   $('#satViewCtl').hidden = false;
   $('#satBoxCtl').hidden = true;
   $('#satUse').disabled = true;
-  $('#satStatus').textContent = 'Drag to move the map. Use the buttons to zoom or rotate. When your yard is in the middle, tap "This view shows my yard".';
+  $('#satStatus').textContent = 'Drag with one finger to move the map. Pinch to zoom and twist with two fingers to rotate. When your yard is in the middle, tap "This view shows my yard".';
 }
 function satEnterBox(){
   if(!satBase) return;
@@ -1178,17 +1177,39 @@ function satEnterBox(){
     : 'Draw a box around your property, then tap Use this box.';
 }
 
-// pan: drag moves the content with the pointer, turned and zoomed as shown
-function satPanMove(e){
-  if(!satPan) return;
-  const dx = e.clientX - satPan.x, dy = e.clientY - satPan.y;
-  satPan = {x: e.clientX, y: e.clientY};
+// pan: the content moves with the pointer, turned and zoomed as shown
+function satPanBy(dx, dy){
   const k = satView.width / satView.getBoundingClientRect().width / satZoom; // source px per screen px
   const t = satRot * Math.PI / 180, c = Math.cos(t), s = Math.sin(t);
   const sx = dx * k, sy = dy * k;
   satOff.x -= sx * c + sy * s;
   satOff.y -= -sx * s + sy * c;
   renderSat();
+}
+
+// two fingers: pinch to zoom, twist to rotate, and move together to pan (like Google Maps and Apple Maps)
+const satPtrs = new Map();
+let satGesture = null;
+function satGestureStart(){
+  const [a, b] = [...satPtrs.values()];
+  satPan = null;
+  satGesture = {
+    dist: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)),
+    ang: Math.atan2(b.y - a.y, b.x - a.x),
+    zoom: satZoom, rot: satRot,
+    mid: {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2}
+  };
+}
+function satGestureMove(){
+  if(!satGesture) return;
+  const [a, b] = [...satPtrs.values()];
+  const dist = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
+  const ang = Math.atan2(b.y - a.y, b.x - a.x);
+  const mid = {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2};
+  satZoom = Math.min(4, Math.max(0.75, satGesture.zoom * dist / satGesture.dist));
+  satRot = ((satGesture.rot + (ang - satGesture.ang) * 180 / Math.PI) % 360 + 360) % 360;
+  satPanBy(mid.x - satGesture.mid.x, mid.y - satGesture.mid.y);
+  satGesture.mid = mid;
 }
 
 // draw the view: the address sits in the middle, turned and zoomed as the user chose
@@ -1212,8 +1233,6 @@ function satChangeView(fn){
 }
 $('#satZoomIn').onclick  = ()=>satChangeView(()=>{ satZoom = Math.min(4, satZoom * 1.5); });
 $('#satZoomOut').onclick = ()=>satChangeView(()=>{ satZoom = Math.max(0.75, satZoom / 1.5); });
-$('#satRotL').onclick    = ()=>satChangeView(()=>{ satRot = (satRot + 270) % 360; });
-$('#satRotR').onclick    = ()=>satChangeView(()=>{ satRot = (satRot + 90) % 360; });
 $('#satDraw').onclick    = ()=>satEnterBox();
 $('#satAdjust').onclick  = ()=>satEnterView();
 
@@ -1234,7 +1253,12 @@ $('#satStage').addEventListener('pointerdown', e=>{
   if(!satView) return;
   e.preventDefault();
   try{ $('#satStage').setPointerCapture(e.pointerId); }catch(_){}
-  if(satMode === 'view'){ satPan = {x: e.clientX, y: e.clientY}; return; }
+  if(satMode === 'view'){
+    satPtrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    if(satPtrs.size === 1) satPan = {x: e.clientX, y: e.clientY};
+    else if(satPtrs.size === 2) satGestureStart();
+    return;
+  }
   if(satTainted) return;
   const p = satPoint(e);
   satDragging = true;
@@ -1243,14 +1267,29 @@ $('#satStage').addEventListener('pointerdown', e=>{
   drawSatRect();
 });
 $('#satStage').addEventListener('pointermove', e=>{
-  if(satMode === 'view'){ satPanMove(e); return; }
+  if(satMode === 'view'){
+    if(!satPtrs.has(e.pointerId)) return;
+    satPtrs.set(e.pointerId, {x: e.clientX, y: e.clientY});
+    if(satPtrs.size >= 2) satGestureMove();
+    else if(satPan){
+      const dx = e.clientX - satPan.x, dy = e.clientY - satPan.y;
+      satPan = {x: e.clientX, y: e.clientY};
+      satPanBy(dx, dy);
+    }
+    return;
+  }
   if(!satDragging) return;
   const p = satPoint(e);
   satSel.x1 = p.x; satSel.y1 = p.y;
   drawSatRect();
 });
-function endSatDrag(){
-  if(satPan){ satPan = null; return; }
+function endSatDrag(e){
+  if(satMode === 'view' && e){
+    satPtrs.delete(e.pointerId);
+    satGesture = null; satPan = null;
+    if(satPtrs.size === 1){ const p = [...satPtrs.values()][0]; satPan = {x: p.x, y: p.y}; }
+    return;
+  }
   if(!satDragging) return;
   satDragging = false;
   const big = satSel && Math.abs(satSel.x1-satSel.x0) >= 0.05 && Math.abs(satSel.y1-satSel.y0) >= 0.05;
