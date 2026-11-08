@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sprinkler Map</title>
+<style>
+:root{--bg:#f4f6f8;--ink:#1f2933;--muted:#667085;--line:#d0d5dd;--accent:#1f6feb;--red:#dc2626;--warn:#92400e;--warnbg:#fef3c7}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:max(10px,env(safe-area-inset-top)) 12px 8px}
+.topbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.title{font-weight:700;font-size:18px;margin-right:auto}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.on{background:#e8f0fe;border-color:var(--accent);color:var(--accent);font-weight:600}
+button.danger{color:var(--red)}
+button.sm{min-height:30px;padding:4px 8px}
+button.big{min-height:48px;font-size:16px;width:100%}
+#hint{font-size:14px;color:var(--muted);margin-top:8px;min-height:20px}
+main{display:flex;flex-direction:column;gap:12px;padding:12px;max-width:1400px;margin:0 auto}
+@media(min-width:900px){main{flex-direction:row;align-items:flex-start}}
+#stageWrap{flex:1;min-width:0;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:auto;-webkit-overflow-scrolling:touch;max-height:72vh}
+#stage{position:relative;width:100%}
+#stage img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
+#stage.place{cursor:crosshair}
+#layer{position:absolute;inset:0;pointer-events:none}
+.mk{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);touch-action:none;cursor:pointer;user-select:none;pointer-events:auto;white-space:nowrap}
+.head{width:24px;height:24px;border-radius:50%;background:#1f6feb}
+.head.unassigned{background:var(--red)}
+.mk.sel{outline:3px solid #facc15;outline-offset:2px}
+.eq{min-width:30px;height:30px;padding:0 4px;border-radius:6px;font-size:11px}
+.eq-controller{background:#111827}
+.eq-shutoff{background:#0e7490}
+.eq-valve{background:#fff;color:#111;border:2px solid #111;border-radius:50%}
+.eq-winterize{background:#7c3aed}
+.tmp{width:8px;height:8px;border-radius:50%;background:#facc15;border:1px solid #111;border-width:1px}
+#side{width:100%;max-width:340px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:14px}
+@media(min-width:900px){#side{width:340px;flex:none}}
+#side h3{margin:0 0 6px;font-size:15px}
+#side section{display:flex;flex-direction:column;gap:8px}
+.muted{color:var(--muted);font-size:13px;margin:0}
+.warn{background:var(--warnbg);color:var(--warn);padding:8px;border-radius:8px;font-size:13px;margin:0}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.zrow{display:flex;align-items:center;gap:6px;padding:4px;border-radius:8px;border:1px solid transparent}
+.zrow.on{border-color:var(--accent);background:#f0f6ff}
+.zrow input{flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.chip{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;color:#fff;font-weight:700;font-size:12px;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.cnt{font-size:13px;color:var(--muted);min-width:18px;text-align:right}
+label{display:flex;flex-direction:column;gap:4px;font-size:14px}
+label.radio{flex-direction:row;align-items:center;gap:8px}
+select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;width:100%}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.card{background:#fff;border-radius:14px;padding:20px;max-width:460px;width:100%;display:flex;flex-direction:column;gap:10px;max-height:90vh;overflow:auto}
+.card h2{margin:0;font-size:20px}
+.card p{margin:0;font-size:14px}
+#splash{background:#1f6feb;color:#fff;text-align:center}
+#splash h1{margin:0 0 8px;font-size:32px}
+#splash p{margin:0 0 24px;font-size:18px}
+#splash small{opacity:.8}
+/* printing */
+#printArea{display:none}
+.sheet .phead{margin-bottom:8px}
+.ptitle{font-size:20px;font-weight:700}
+.psub{font-size:12px;color:#555}
+.pwrap{text-align:center;margin:6px 0}
+.pstage{display:inline-block;position:relative;max-width:100%}
+.pstage img{display:block;max-height:6.2in;max-width:100%;width:auto;height:auto}
+.pstage .layer{position:absolute;inset:0}
+.ptable{width:100%;border-collapse:collapse;font-size:11px;margin-top:8px}
+.ptable th,.ptable td{border-bottom:1px solid #ccc;padding:3px 4px;text-align:left;vertical-align:top}
+.disc{font-size:9px;color:#444;margin-top:10px}
+@media print{
+  body>*:not(#printArea){display:none!important}
+  #printArea{display:block!important}
+  @page{size:letter;margin:.5in}
+  .sheet{page-break-after:always;break-after:page}
+  .sheet:last-child{page-break-after:auto;break-after:auto}
+  .mk{box-shadow:none}
+}
+</style>
+</head>
+<body>
+
+<div id="splash" class="overlay" hidden>
+  <div>
+    <h1>Sprinkler Map</h1>
+    <p>Map your sprinkler system</p>
+    <small>Tap anywhere to continue · v1</small>
+  </div>
+</div>
+
+<div id="setup" class="overlay" hidden>
+  <div class="card">
+    <h2>Choose your map picture</h2>
+    <p>Use a screenshot of your yard from Google Maps or Apple Maps (satellite view works best), or upload your own picture. This app cannot pull the map itself.</p>
+    <p class="warn">Privacy: this app does not store your address. Your picture may still show a house number or street label, and the picture is saved inside your file. Crop it first if you don't want that.</p>
+    <button class="primary big" data-src="upload">Upload my own picture</button>
+    <button class="big" data-src="google">Use a Google Maps screenshot</button>
+    <button class="big" data-src="apple">Use an Apple Maps screenshot</button>
+    <button id="setupCancel" class="big">Cancel</button>
+  </div>
+</div>
+
+<header>
+  <div class="topbar">
+    <span class="title">Sprinkler Map</span>
+    <button id="bNew">New</button>
+    <button id="bOpen">Open</button>
+    <button id="bSave" class="primary">Save</button>
+    <button id="bPic">Change picture</button>
+    <button id="bPrint">Print</button>
+  </div>
+  <div class="toolbar" id="modes">
+    <button data-mode="select" class="on">Select / move</button>
+    <button data-mode="head">Sprinkler head</button>
+    <button data-mode="controller">Controller</button>
+    <button data-mode="shutoff">Water shutoff</button>
+    <button data-mode="valve">Valve</button>
+    <button data-mode="winterize">Winterize point</button>
+    <span style="margin-left:auto"></span>
+    <button id="zout">−</button>
+    <span id="zoomLbl" class="muted">100%</span>
+    <button id="zin">+</button>
+  </div>
+  <div id="hint"></div>
+</header>
+
+<main>
+  <div id="stageWrap" hidden>
+    <div id="stage">
+      <img id="mapImg" alt="Yard map" draggable="false">
+      <div id="layer"></div>
+    </div>
+  </div>
+  <aside id="side"></aside>
+</main>
+
+<div id="printArea"></div>
+
+<input type="file" id="fileImg" accept="image/*" hidden>
+<input type="file" id="fileOpen" accept=".json,application/json" hidden>
+
+<script>
+const KEY = 'sprinkler-map-autosave';
+const PALETTE = ['#1f6feb','#2da44e','#d97706','#8250df','#0891b2','#bf3989','#8b5a2b','#4b5563','#ca8a04','#4338ca','#65a30d','#0f766e'];
+const KIND = {
+  controller:{prefix:'C', name:'Sprinkler controller'},
+  valve:{prefix:'V', name:'Valve'},
+  shutoff:{prefix:'S', name:'Water shutoff'},
+  winterize:{prefix:'W', name:'Winterization point'}
+};
+const HEAD_TYPES = ['unknown','spray','rotor','drip','bubbler','other'];
+const HEAD_LABEL = {unknown:'Not sure',spray:'Spray',rotor:'Rotor',drip:'Drip',bubbler:'Bubbler',other:'Other'};
+
+let doc = newDoc();
+let mode = 'select', sel = null, activeZone = null, dirty = false, zoom = 1;
+let measurePts = [], lastDist = null, drag = null, suppressClick = false;
+let pendingSource = 'upload', printMode = 'yard', saveTimer = null;
+let flashMsg = '', flashT = null, autoNote = '';
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = v => Math.min(1, Math.max(0, v));
+const uid = () => Math.random().toString(36).slice(2, 9);
+const zoneById = id => doc.zones.find(z => z.id === id);
+const findItem = id => doc.heads.find(h => h.id === id) || doc.equipment.find(q => q.id === id);
+const zoneLabel = z => z ? `Zone ${z.num}${z.name ? ' – ' + z.name : ''}` : 'no zone';
+
+function newDoc(){
+  return {
+    app:'SprinkMap', version:1, name:'', mapSource:null, image:null, mapW:0, mapH:0,
+    scale:null,
+    zones: PALETTE.slice(0,6).map((c,i)=>({id:uid(), num:i+1, name:'', color:c})),
+    heads:[], equipment:[], updated:new Date().toISOString()
+  };
+}
+
+function touch(){
+  dirty = true;
+  doc.updated = new Date().toISOString();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(autosave, 400);
+}
+
+function autosave(){
+  try{
+    localStorage.setItem(KEY, JSON.stringify(doc));
+    if(autoNote){ autoNote=''; renderSide(); }
+  }catch(e){
+    autoNote = 'Autosave is full for this picture. Use Save to keep your work.';
+    renderSide();
+  }
+}
+
+function flash(m){
+  flashMsg = m; updateHint();
+  clearTimeout(flashT);
+  flashT = setTimeout(()=>{ flashMsg=''; updateHint(); }, 6000);
+}
+
+function pt(e){
+  const r = $('#stage').getBoundingClientRect();
+  return {x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height)};
+}
+
+/* ---------- rendering ---------- */
+function markersHTML(zoneFilter, forPrint){
+  const s = forPrint ? null : sel;
+  let out = '';
+  for(const h of doc.heads){
+    if(zoneFilter !== undefined && h.zone !== zoneFilter) continue;
+    const z = zoneById(h.zone);
+    out += `<div class="mk head${z?'':' unassigned'}${h.id===s?' sel':''}" data-id="${h.id}" style="left:${h.x*100}%;top:${h.y*100}%${z?';background:'+z.color:''}">${z?z.num:'?'}</div>`;
+  }
+  for(const q of doc.equipment){
+    out += `<div class="mk eq eq-${q.kind}${q.id===s?' sel':''}" data-id="${q.id}" style="left:${q.x*100}%;top:${q.y*100}%">${esc(q.code)}</div>`;
+  }
+  if(!forPrint) measurePts.forEach(p => out += `<div class="mk tmp" style="left:${p.x*100}%;top:${p.y*100}%"></div>`);
+  return out;
+}
+
+function renderMap(){
+  const img = $('#mapImg');
+  $('#stageWrap').hidden = !doc.image;
+  if(doc.image && img.getAttribute('src') !== doc.image) img.src = doc.image;
+  $('#stage').style.width = (zoom*100) + '%';
+  $('#layer').innerHTML = doc.image ? markersHTML(undefined, false) : '';
+  $('#zoomLbl').textContent = Math.round(zoom*100) + '%';
+  document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  $('#stage').classList.toggle('place', mode !== 'select');
+}
+
+function renderSide(){
+  const zoneRows = doc.zones.map(z=>{
+    const n = doc.heads.filter(h=>h.zone===z.id).length;
+    return `<div class="zrow${z.id===activeZone?' on':''}" data-zrow="${z.id}">
+      <span class="chip" style="background:${z.color}">${z.num}</span>
+      <input data-zname="${z.id}" value="${esc(z.name)}" placeholder="Name (optional)" aria-label="Zone ${z.num} name">
+      <span class="cnt">${n}</span>
+      <button class="danger sm" data-zdel="${z.id}" aria-label="Delete zone ${z.num}">✕</button>
+    </div>`;
+  }).join('');
+  const unassigned = doc.heads.filter(h=>!h.zone).length;
+
+  let editor = '<p class="muted">Select a head or equipment on the map to edit it.</p>';
+  const it = sel && findItem(sel);
+  if(it){
+    if(doc.heads.includes(it)){
+      editor = `<h3>Sprinkler head</h3>
+        <label>Zone<select data-hzone="${it.id}"><option value="">Needs assignment</option>${doc.zones.map(z=>`<option value="${z.id}"${z.id===it.zone?' selected':''}>${esc(zoneLabel(z))}</option>`).join('')}</select></label>
+        <label>Head type<select data-htype="${it.id}">${HEAD_TYPES.map(t=>`<option value="${t}"${t===it.type?' selected':''}>${HEAD_LABEL[t]}</option>`).join('')}</select></label>
+        <button class="danger" data-del="${it.id}">Delete head</button>`;
+    } else {
+      editor = `<h3>${esc(KIND[it.kind].name)} · ${esc(it.code)}</h3>
+        <label>Name<input data-ename="${it.id}" value="${esc(it.name)}"></label>
+        <label>Notes<textarea data-enotes="${it.id}" rows="2">${esc(it.notes)}</textarea></label>
+        <button class="danger" data-del="${it.id}">Delete</button>`;
+    }
+  }
+
+  $('#side').innerHTML = `
+    ${autoNote ? `<p class="warn">${esc(autoNote)}</p>` : ''}
+    <section>
+      <h3>Scale</h3>
+      <p class="muted">${doc.scale ? 'Scale is set. Use Measure to read distances in feet.' : 'Not set. Tap two points a known distance apart, then enter that distance in feet.'}</p>
+      <div class="row">
+        <button data-mode-set="calibrate">Set scale</button>
+        <button data-mode-set="measure" ${doc.scale?'':'disabled'}>Measure</button>
+      </div>
+    </section>
+    <section>
+      <h3>Zones</h3>
+      <p class="muted">Tap a zone to make it active. New heads go to the active zone.</p>
+      ${zoneRows || '<p class="muted">No zones yet.</p>'}
+      <button data-zadd>+ Add zone</button>
+      <p class="muted">Heads needing assignment: <b>${unassigned}</b></p>
+    </section>
+    <section>${editor}</section>
+    <section>
+      <h3>Print</h3>
+      <label class="radio"><input type="radio" name="pm" value="yard" ${printMode==='yard'?'checked':''}> Whole yard only</label>
+      <label class="radio"><input type="radio" name="pm" value="zones" ${printMode==='zones'?'checked':''}> Whole yard + one sheet per zone</label>
+      <button class="primary" data-print>Print</button>
+    </section>`;
+}
+
+function hintText(){
+  if(flashMsg) return flashMsg;
+  switch(mode){
+    case 'select': return 'Tap an item to edit it. Drag to move it.';
+    case 'head': return `Tap the map to add a sprinkler head to ${activeZone ? zoneLabel(zoneById(activeZone)) : 'no zone (needs assignment)'}.`;
+    case 'calibrate': return `Tap two points a known distance apart (${measurePts.length}/2).`;
+    case 'measure':
+      if(measurePts.length===0 && lastDist!==null) return `Last distance: ${lastDist} ft. Tap two points to measure again.`;
+      return `Tap two points to measure (${measurePts.length}/2).`;
+    default: return `Tap the map to place a ${KIND[mode].name.toLowerCase()}.`;
+  }
+}
+function updateHint(){ $('#hint').textContent = hintText(); }
+function renderAll(){ renderMap(); renderSide(); updateHint(); }
+
+function setMode(m){
+  mode = m; measurePts = []; flashMsg = ''; lastDist = (m==='measure') ? lastDist : null;
+  renderAll();
+}
+
+/* ---------- zones & items ---------- */
+function addZone(){
+  const used = new Set(doc.zones.map(z=>z.color));
+  const color = PALETTE.find(c=>!used.has(c)) || PALETTE[doc.zones.length % PALETTE.length];
+  const num = Math.max(0, ...doc.zones.map(z=>z.num)) + 1;
+  const z = {id:uid(), num, name:'', color};
+  doc.zones.push(z);
+  activeZone = z.id;
+  touch(); renderAll();
+}
+
+function deleteZone(id){
+  const z = zoneById(id);
+  const n = doc.heads.filter(h=>h.zone===id).length;
+  if(!confirm(`Delete ${zoneLabel(z)}?${n ? ` Its ${n} head(s) will need assignment.` : ''}`)) return;
+  doc.heads.forEach(h=>{ if(h.zone===id) h.zone = null; });
+  doc.zones = doc.zones.filter(z=>z.id!==id);
+  if(activeZone===id) activeZone = doc.zones[0]?.id ?? null;
+  touch(); renderAll();
+}
+
+function addItem(kind, p){
+  let it;
+  if(kind==='head'){
+    it = {id:uid(), x:p.x, y:p.y, zone:activeZone, type:'unknown'};
+    doc.heads.push(it);
+  } else {
+    const pre = KIND[kind].prefix;
+    const nums = doc.equipment.filter(q=>q.kind===kind).map(q=>parseInt(q.code.slice(pre.length))||0);
+    const n = Math.max(0, ...nums) + 1;
+    it = {id:uid(), kind, code:pre+n, name:KIND[kind].name, notes:'', x:p.x, y:p.y};
+    doc.equipment.push(it);
+  }
+  sel = it.id;
+  touch(); renderAll();
+}
+
+function deleteItem(id){
+  const it = findItem(id);
+  if(!it) return;
+  const label = doc.heads.includes(it) ? 'sprinkler head' : KIND[it.kind].name.toLowerCase();
+  if(!confirm(`Delete this ${label}?`)) return;
+  doc.heads = doc.heads.filter(h=>h.id!==id);
+  doc.equipment = doc.equipment.filter(q=>q.id!==id);
+  if(sel===id) sel = null;
+  touch(); renderAll();
+}
+
+/* ---------- scale & measuring ---------- */
+function finishMeasure(){
+  const [a,b] = measurePts;
+  const px = Math.hypot((b.x-a.x)*doc.mapW, (b.y-a.y)*doc.mapH);
+  if(mode==='calibrate'){
+    const ft = parseFloat(prompt('How many feet is the distance between those two points?'));
+    measurePts = [];
+    if(ft>0 && px>0){
+      doc.scale = {feetPerImgPx: ft/px};
+      touch();
+      setMode('select');
+      flash('Scale set.');
+    } else {
+      flash('Scale not set. Try two points farther apart and enter the distance in feet.');
+      renderMap();
+    }
+  } else {
+    const ft = px * doc.scale.feetPerImgPx;
+    lastDist = ft.toFixed(1);
+    measurePts = [];
+    renderMap(); updateHint();
+  }
+}
+
+/* ---------- files ---------- */
+function clearAutosave(){ try{ localStorage.removeItem(KEY); }catch(e){} autoNote=''; }
+
+function showSetup(){
+  $('#setupCancel').hidden = !doc.image;
+  $('#setup').hidden = false;
+}
+
+function saveFile(){
+  const name = prompt('Name for this file', doc.name || 'sprinkler-map');
+  if(!name) return;
+  doc.name = name.trim();
+  const blob = new Blob([JSON.stringify(doc)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = doc.name + '.sprinkler.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  dirty = false; clearAutosave();
+  flash('Saved ' + doc.name + '.');
+}
+
+function afterLoad(){
+  activeZone = doc.zones[0]?.id ?? null;
+  sel = null; measurePts = []; lastDist = null; zoom = 1;
+  mode = 'select';
+  if(!doc.image) showSetup();
+  renderAll();
+}
+
+/* ---------- printing ---------- */
+function sheetHTML(s, date, img){
+  const heads = doc.heads.filter(h => s.zone===undefined || h.zone===s.zone);
+  const unassigned = doc.heads.filter(h=>!h.zone).length;
+  const zoneRows = s.zone===undefined
+    ? doc.zones.map(z=>`<tr><td><span class="chip" style="background:${z.color}">${z.num}</span></td><td>${esc(z.name)||'—'}</td><td>${doc.heads.filter(h=>h.zone===z.id).length}</td></tr>`).join('')
+      + (unassigned ? `<tr><td>?</td><td>Needs assignment</td><td>${unassigned}</td></tr>` : '')
+    : `<tr><td>${zoneById(s.zone).num}</td><td>${esc(zoneById(s.zone).name)||'—'}</td><td>${heads.length}</td></tr>`;
+  const eq = doc.equipment.map(q=>`<tr><td>${esc(q.code)}</td><td>${esc(KIND[q.kind].name)}</td><td>${esc(q.name)}</td><td>${esc(q.notes)}</td></tr>`).join('');
+  return `<section class="sheet">
+    <div class="phead">
+      <div class="ptitle">${esc(doc.name || 'Sprinkler Map')}</div>
+      <div class="psub">${esc(s.title)} · Last updated ${date}</div>
+    </div>
+    <div class="pwrap"><div class="pstage"><img src="${img}" alt=""><div class="layer">${markersHTML(s.zone, true)}</div></div></div>
+    <table class="ptable"><thead><tr><th>Zone</th><th>Name</th><th>Heads</th></tr></thead><tbody>${zoneRows}</tbody></table>
+    <table class="ptable"><thead><tr><th>Code</th><th>Type</th><th>Name</th><th>Notes</th></tr></thead><tbody>${eq || '<tr><td colspan="4">No equipment marked</td></tr>'}</tbody></table>
+    <p class="disc">For reference only. Check with a licensed irrigation contractor or qualified professional before sprinkler, plumbing, or winterization work.</p>
+  </section>`;
+}
+
+function printSheets(){
+  if(!doc.image){ flash('Add a map picture first.'); return; }
+  const sheets = [{title:'Whole yard', zone:undefined}];
+  if(printMode==='zones') doc.zones.forEach(z=>sheets.push({title:zoneLabel(z), zone:z.id}));
+  const date = new Date(doc.updated).toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
+  $('#printArea').innerHTML = sheets.map(s=>sheetHTML(s, date, doc.image)).join('');
+  setTimeout(()=>window.print(), 300);
+}
+
+/* ---------- events ---------- */
+// splash & startup
+function afterSplash(){
+  let restored = false;
+  try{
+    const saved = localStorage.getItem(KEY);
+    if(saved && confirm('Restore your unsaved work from last time?')){
+      doc = JSON.parse(saved);
+      dirty = true; restored = true;
+    }
+  }catch(e){}
+  if(!restored) doc = doc || newDoc();
+  afterLoad();
+}
+$('#splash').addEventListener('click', ()=>{
+  $('#splash').hidden = true;
+  afterSplash();
+});
+
+// header buttons
+$('#bNew').onclick = ()=>{
+  if(dirty && !confirm('Discard unsaved work?')) return;
+  doc = newDoc(); dirty = false; clearAutosave();
+  afterLoad();
+};
+$('#bOpen').onclick = ()=>{
+  if(dirty && !confirm('Discard unsaved work?')) return;
+  $('#fileOpen').click();
+};
+$('#fileOpen').addEventListener('change', e=>{
+  const f = e.target.files[0]; e.target.value = '';
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const d = JSON.parse(r.result);
+      if(d.app!=='SprinkMap') throw new Error('not a sprinkler file');
+      d.zones = d.zones || []; d.heads = d.heads || []; d.equipment = d.equipment || [];
+      doc = d; dirty = false; clearAutosave();
+      afterLoad();
+      flash('Opened ' + (d.name || f.name) + '.');
+    }catch(err){
+      alert('That file could not be opened as a Sprinkler Map.');
+    }
+  };
+  r.readAsText(f);
+});
+$('#bSave').onclick = saveFile;
+$('#bPrint').onclick = printSheets;
+$('#bPic').onclick = ()=>showSetup();
+$('#zin').onclick = ()=>{ zoom = Math.min(3, zoom+0.5); renderMap(); };
+$('#zout').onclick = ()=>{ zoom = Math.max(1, zoom-0.5); renderMap(); };
+$('#modes').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-mode]');
+  if(b) setMode(b.dataset.mode);
+});
+
+// setup / picture
+document.querySelectorAll('[data-src]').forEach(b=>{
+  b.onclick = ()=>{ pendingSource = b.dataset.src; $('#fileImg').click(); };
+});
+$('#setupCancel').onclick = ()=>{ $('#setup').hidden = true; };
+$('#fileImg').addEventListener('change', e=>{
+  const f = e.target.files[0]; e.target.value = '';
+  if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    const im = new Image();
+    im.onload = ()=>{
+      doc.image = r.result;
+      doc.mapW = im.naturalWidth; doc.mapH = im.naturalHeight;
+      doc.mapSource = pendingSource;
+      doc.scale = null;
+      touch();
+      $('#setup').hidden = true;
+      mode = 'select';
+      renderAll();
+      flash('Picture loaded. Your picture may show your address. This app does not store it, but the picture is saved in your file. Next, set the scale.');
+    };
+    im.src = r.result;
+  };
+  r.readAsDataURL(f);
+});
+
+// map stage: placing, selecting, dragging
+$('#stage').addEventListener('pointerdown', e=>{
+  const mk = e.target.closest('.mk');
+  if(!mk || mode!=='select' || !mk.dataset.id) return;
+  e.preventDefault();
+  sel = mk.dataset.id;
+  drag = {id:sel, el:mk, moved:false};
+  try{ mk.setPointerCapture(e.pointerId); }catch(_){}
+  renderSide();
+});
+$('#stage').addEventListener('pointermove', e=>{
+  if(!drag) return;
+  const p = pt(e);
+  const it = findItem(drag.id);
+  if(!it) return;
+  it.x = p.x; it.y = p.y;
+  drag.el.style.left = (p.x*100)+'%';
+  drag.el.style.top = (p.y*100)+'%';
+  drag.moved = true;
+});
+function endDrag(){
+  if(!drag) return;
+  const moved = drag.moved;
+  drag = null;
+  if(moved){ suppressClick = true; touch(); }
+  renderAll();
+}
+$('#stage').addEventListener('pointerup', endDrag);
+$('#stage').addEventListener('pointercancel', endDrag);
+
+$('#stage').addEventListener('click', e=>{
+  if(!doc.image) return;
+  if(suppressClick){ suppressClick = false; return; }
+  if(e.target.closest('.mk')) return;
+  const p = pt(e);
+  if(mode==='select'){ if(sel){ sel = null; renderAll(); } return; }
+  if(mode==='head'){ addItem('head', p); return; }
+  if(mode==='calibrate' || mode==='measure'){
+    measurePts.push(p);
+    if(measurePts.length===2) finishMeasure();
+    else { renderMap(); updateHint(); }
+    return;
+  }
+  addItem(mode, p);
+});
+
+// side panel
+$('#side').addEventListener('click', e=>{
+  const t = e.target;
+  const ms = t.closest('[data-mode-set]');
+  if(ms){ if(!ms.disabled) setMode(ms.dataset.modeSet); return; }
+  if(t.closest('[data-zadd]')){ addZone(); return; }
+  const zd = t.closest('[data-zdel]');
+  if(zd){ deleteZone(zd.dataset.zdel); return; }
+  const del = t.closest('[data-del]');
+  if(del){ deleteItem(del.dataset.del); return; }
+  if(t.closest('[data-print]')){ printSheets(); return; }
+  const row = t.closest('[data-zrow]');
+  if(row && !t.closest('input,button')){
+    activeZone = row.dataset.zrow;
+    renderSide(); updateHint();
+  }
+});
+$('#side').addEventListener('input', e=>{
+  const t = e.target;
+  if(t.dataset.zname){ const z = zoneById(t.dataset.zname); if(z) z.name = t.value; }
+  else if(t.dataset.ename){ const it = findItem(t.dataset.ename); if(it) it.name = t.value; }
+  else if(t.dataset.enotes){ const it = findItem(t.dataset.enotes); if(it) it.notes = t.value; }
+  else return;
+  touch();
+});
+$('#side').addEventListener('change', e=>{
+  const t = e.target;
+  if(t.dataset.hzone){ const h = findItem(t.dataset.hzone); if(h){ h.zone = t.value || null; touch(); renderAll(); } }
+  else if(t.dataset.htype){ const h = findItem(t.dataset.htype); if(h){ h.type = t.value; touch(); } }
+  else if(t.name==='pm'){ printMode = t.value; }
+});
+
+// boot
+renderAll();
+</script>
+</body>
+</html>
