@@ -8,13 +8,16 @@
 :root{--bg:#f4f6f8;--ink:#1f2933;--muted:#667085;--line:#d0d5dd;--accent:#1f6feb;--red:#dc2626;--warn:#92400e;--warnbg:#fef3c7}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-html,body{overscroll-behavior:none}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
-header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:max(10px,env(safe-area-inset-top)) 12px 8px}
-.topbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+html,body{overscroll-behavior:none;height:100%}
+body{margin:0;display:flex;flex-direction:column;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{flex:none;position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:max(10px,env(safe-area-inset-top)) 12px 0}
+.topbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:8px}
 .title{font-weight:700;font-size:18px;margin-right:auto}
 .ver{font-size:12px;font-weight:400;color:var(--muted);margin-left:4px}
-.toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:none;border-bottom:3px solid transparent;border-radius:0;background:none;padding:10px 14px;color:var(--muted);min-height:44px;white-space:nowrap}
+.tabs button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;background:none}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px 0;align-items:center}
 button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
 button:disabled{opacity:.45;cursor:default}
 button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -22,12 +25,12 @@ button.on{background:#e8f0fe;border-color:var(--accent);color:var(--accent);font
 button.danger{color:var(--red)}
 button.sm{min-height:30px;padding:4px 8px}
 button.big{min-height:48px;font-size:16px;width:100%}
-#hint{font-size:14px;color:var(--muted);margin-top:8px;min-height:20px}
-main{display:flex;flex-direction:column;gap:12px;padding:12px;max-width:1400px;margin:0 auto}
-@media(min-width:900px){main{flex-direction:row;align-items:flex-start}}
-#stageWrap{flex:1;min-width:0;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:auto;-webkit-overflow-scrolling:touch;max-height:72vh}
-#stage{position:relative;width:100%}
-#stage img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
+#hint{font-size:14px;color:var(--muted);padding-bottom:8px;min-height:28px}
+main{flex:1;min-height:0;width:100%;display:flex;flex-direction:row;align-items:stretch;gap:12px;padding:12px;max-width:1400px;margin:0 auto}
+@media(max-width:640px){main{flex-direction:column}}
+#stageWrap{flex:1;min-width:0;min-height:0;display:flex;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:auto;-webkit-overflow-scrolling:touch}
+#stage{position:relative;flex:none;margin:auto}
+#stage img{display:block;width:100%;height:100%;user-select:none;-webkit-user-drag:none}
 #stage.place{cursor:crosshair}
 #layer{position:absolute;inset:0;pointer-events:none}
 .mk{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4);touch-action:none;cursor:pointer;user-select:none;pointer-events:auto;white-space:nowrap}
@@ -39,9 +42,9 @@ main{display:flex;flex-direction:column;gap:12px;padding:12px;max-width:1400px;m
 .eq-shutoff{background:#0e7490}
 .eq-valve{background:#fff;color:#111;border:2px solid #111;border-radius:50%}
 .eq-winterize{background:#7c3aed}
-.tmp{width:8px;height:8px;border-radius:50%;background:#facc15;border:1px solid #111;border-width:1px}
-#side{width:100%;max-width:340px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:14px}
-@media(min-width:900px){#side{width:340px;flex:none}}
+.tmp{width:8px;height:8px;border-radius:50%;background:#facc15;border:1px solid #111}
+#side{width:300px;flex:none;min-height:0;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:14px}
+@media(max-width:640px){#side{width:auto;flex:1 1 45%}#stageWrap{flex:1 1 55%}}
 #side h3{margin:0 0 6px;font-size:15px}
 #side section{display:flex;flex-direction:column;gap:8px}
 .muted{color:var(--muted);font-size:13px;margin:0}
@@ -52,6 +55,9 @@ main{display:flex;flex-direction:column;gap:12px;padding:12px;max-width:1400px;m
 .zrow input{flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:6px;font:inherit}
 .chip{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;color:#fff;font-weight:700;font-size:12px;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
 .cnt{font-size:13px;color:var(--muted);min-width:18px;text-align:right}
+.eqlist{display:flex;flex-direction:column;gap:4px}
+.eqrow{text-align:left;width:100%}
+.eqrow.on{border-color:var(--accent);background:#f0f6ff;color:var(--accent);font-weight:600}
 label{display:flex;flex-direction:column;gap:4px;font-size:14px}
 label.radio{flex-direction:row;align-items:center;gap:8px}
 select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;width:100%}
@@ -67,6 +73,10 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 #cropImg{display:block;max-width:100%;max-height:55vh;width:auto;height:auto;pointer-events:none;margin:0 auto}
 #cropRect{position:absolute;border:2px dashed #facc15;background:rgba(250,204,21,.18);pointer-events:none}
 #mapAddr{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;width:100%}
+.legend{display:flex;flex-direction:column;gap:6px;margin-top:10px;font-size:13px}
+.legend h4{margin:6px 0 0;font-size:13px}
+.legend .row2{display:flex;align-items:center;gap:8px}
+.legend .code{display:inline-block;min-width:34px;font-weight:700}
 /* printing */
 #printArea{display:none}
 .sheet .phead{margin-bottom:8px}
@@ -80,6 +90,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 .ptable th,.ptable td{border-bottom:1px solid #ccc;padding:3px 4px;text-align:left;vertical-align:top}
 .disc{font-size:9px;color:#444;margin-top:10px}
 @media print{
+  html,body{height:auto;overflow:visible;display:block}
   body>*:not(#printArea){display:none!important}
   #printArea{display:block!important}
   @page{size:letter;margin:.5in}
@@ -95,7 +106,7 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
   <div>
     <h1>Sprinkler Map</h1>
     <p>Map your sprinkler system</p>
-    <small>Tap anywhere to continue · v1.1</small>
+    <small>Tap anywhere to continue · v1.3</small>
   </div>
 </div>
 
@@ -127,25 +138,21 @@ select,input[type=text],input:not([type]),textarea{font:inherit;padding:8px;bord
 
 <header>
   <div class="topbar">
-    <span class="title">Sprinkler Map<span class="ver">v1.1</span></span>
+    <span class="title">Sprinkler Map<span class="ver">v1.3</span></span>
+    <button id="bUndo" disabled>Undo</button>
     <button id="bNew">New</button>
     <button id="bOpen">Open</button>
     <button id="bSave" class="primary">Save</button>
     <button id="bPic">Change picture</button>
     <button id="bPrint">Print</button>
   </div>
-  <div class="toolbar" id="modes">
-    <button data-mode="select" class="on">Select / move</button>
-    <button data-mode="head">Sprinkler head</button>
-    <button data-mode="controller">Controller</button>
-    <button data-mode="shutoff">Water shutoff</button>
-    <button data-mode="valve">Valve</button>
-    <button data-mode="winterize">Winterize point</button>
-    <span style="margin-left:auto"></span>
-    <button id="zout">−</button>
-    <span id="zoomLbl" class="muted">100%</span>
-    <button id="zin">+</button>
-  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="map">Map</button>
+    <button data-tab="zones">Zones</button>
+    <button data-tab="equip">Equipment</button>
+    <button data-tab="print">Print</button>
+  </nav>
+  <div class="toolbar" id="toolbar"></div>
   <div id="hint"></div>
 </header>
 
@@ -175,12 +182,14 @@ const KIND = {
 };
 const HEAD_TYPES = ['unknown','spray','rotor','drip','bubbler','other'];
 const HEAD_LABEL = {unknown:'Not sure',spray:'Spray',rotor:'Rotor',drip:'Drip',bubbler:'Bubbler',other:'Other'};
+const MAX_UNDO = 50;
 
 let doc;
-let mode = 'select', sel = null, activeZone = null, dirty = false, zoom = 1;
+let tab = 'map', mode = 'select', sel = null, activeZone = null, dirty = false, zoom = 1;
 let measurePts = [], lastDist = null, drag = null, suppressClick = false;
-let pendingSource = 'upload', printMode = 'yard', saveTimer = null;
+let pendingSource = 'upload', printMode = 'overview', saveTimer = null;
 let flashMsg = '', flashT = null, autoNote = '';
+let undoStack = [], textSnap = null;
 
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -228,6 +237,27 @@ function pt(e){
   return {x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height)};
 }
 
+/* ---------- undo ---------- */
+function snap(){
+  return JSON.stringify({zones:doc.zones, heads:doc.heads, equipment:doc.equipment, scale:doc.scale});
+}
+function checkpoint(s){
+  undoStack.push(s ?? snap());
+  if(undoStack.length > MAX_UNDO) undoStack.shift();
+  updateUndo();
+}
+function updateUndo(){ $('#bUndo').disabled = undoStack.length === 0; }
+function undo(){
+  if(!undoStack.length){ flash('Nothing to undo.'); return; }
+  const prev = JSON.parse(undoStack.pop());
+  doc.zones = prev.zones; doc.heads = prev.heads; doc.equipment = prev.equipment; doc.scale = prev.scale;
+  if(sel && !findItem(sel)) sel = null;
+  if(activeZone && !zoneById(activeZone)) activeZone = doc.zones[0]?.id ?? null;
+  touch();
+  flash('Undid last change.');
+  renderAll();
+}
+
 /* ---------- rendering ---------- */
 function markersHTML(zoneFilter, forPrint){
   const s = forPrint ? null : sel;
@@ -244,19 +274,57 @@ function markersHTML(zoneFilter, forPrint){
   return out;
 }
 
+// size the map so the whole picture fits the visible area (no page scrolling); zoom grows it inside its own box
+function fitStage(){
+  const wrap = $('#stageWrap'), st = $('#stage');
+  if(!doc.image || !doc.mapW || wrap.hidden) return;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  if(!W || !H) return;
+  const ratio = doc.mapH / doc.mapW;
+  const w = Math.max(1, Math.min(W - 4, (H - 4) / ratio) * zoom);
+  st.style.width = w + 'px';
+  st.style.height = (w * ratio) + 'px';
+}
+
+function renderTabs(){
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+}
+
+function renderToolbar(){
+  const btn = (m, label, extra='') => `<button data-mode="${m}"${extra}>${label}</button>`;
+  let html;
+  if(tab === 'map'){
+    html = btn('select','Select / move') + btn('head','Sprinkler head') + btn('calibrate','Set scale') + btn('measure','Measure', doc.scale ? '' : ' disabled');
+  } else if(tab === 'equip'){
+    html = btn('select','Select / move') + btn('controller','Controller') + btn('shutoff','Water shutoff') + btn('valve','Valve') + btn('winterize','Winterize point');
+  } else if(tab === 'zones'){
+    html = btn('select','Select / move') + '<span class="muted">Tap a head to select it.</span>';
+  } else {
+    html = '<span class="muted">Preview only. Options are in the side panel.</span>';
+  }
+  html += `<span style="margin-left:auto"></span><button data-zoom="-1">−</button><span id="zoomLbl" class="muted">${Math.round(zoom*100)}%</span><button data-zoom="1">+</button>`;
+  $('#toolbar').innerHTML = html;
+}
+
 function renderMap(){
   const img = $('#mapImg');
   $('#stageWrap').hidden = !doc.image;
   if(doc.image && img.getAttribute('src') !== doc.image) img.src = doc.image;
-  $('#stage').style.width = (zoom*100) + '%';
+  fitStage();
   $('#layer').innerHTML = doc.image ? markersHTML(undefined, false) : '';
-  $('#zoomLbl').textContent = Math.round(zoom*100) + '%';
-  document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
-  $('#stage').classList.toggle('place', mode !== 'select');
+  const lbl = $('#zoomLbl'); if(lbl) lbl.textContent = Math.round(zoom*100) + '%';
+  document.querySelectorAll('#toolbar button[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+  $('#stage').classList.toggle('place', mode !== 'select' && tab !== 'print');
 }
 
-function renderSide(){
-  const zoneRows = doc.zones.map(z=>{
+function scaleText(){
+  return doc.scale
+    ? 'Scale is set. Use Measure in the toolbar to read distances in feet.'
+    : 'Not set. Use Set scale in the toolbar: tap two points a known distance apart, then enter that distance in feet.';
+}
+
+function zoneRowsHTML(){
+  return doc.zones.map(z=>{
     const n = doc.heads.filter(h=>h.zone===z.id).length;
     return `<div class="zrow${z.id===activeZone?' on':''}" data-zrow="${z.id}">
       <span class="chip" style="background:${z.color}">${z.num}</span>
@@ -265,52 +333,96 @@ function renderSide(){
       <button class="danger sm" data-zdel="${z.id}" aria-label="Delete zone ${z.num}">✕</button>
     </div>`;
   }).join('');
-  const unassigned = doc.heads.filter(h=>!h.zone).length;
+}
 
-  let editor = '<p class="muted">Select a head or equipment on the map to edit it.</p>';
+function mapSide(){
+  const un = doc.heads.filter(h=>!h.zone).length;
+  const zoneOpts = `<option value="">Needs assignment</option>` + doc.zones.map(z=>`<option value="${z.id}"${z.id===activeZone?' selected':''}>${esc(zoneLabel(z))}</option>`).join('');
+  let editor = '<p class="muted">Tap a head on the map to edit it, or drag it to move it.</p>';
   const it = sel && findItem(sel);
-  if(it){
-    if(doc.heads.includes(it)){
-      editor = `<h3>Sprinkler head</h3>
-        <label>Zone<select data-hzone="${it.id}"><option value="">Needs assignment</option>${doc.zones.map(z=>`<option value="${z.id}"${z.id===it.zone?' selected':''}>${esc(zoneLabel(z))}</option>`).join('')}</select></label>
-        <label>Head type<select data-htype="${it.id}">${HEAD_TYPES.map(t=>`<option value="${t}"${t===it.type?' selected':''}>${HEAD_LABEL[t]}</option>`).join('')}</select></label>
-        <button class="danger" data-del="${it.id}">Delete head</button>`;
-    } else {
-      editor = `<h3>${esc(KIND[it.kind].name)} · ${esc(it.code)}</h3>
-        <label>Name<input data-ename="${it.id}" value="${esc(it.name)}"></label>
-        <label>Notes<textarea data-enotes="${it.id}" rows="2">${esc(it.notes)}</textarea></label>
-        <button class="danger" data-del="${it.id}">Delete</button>`;
-    }
+  if(it && doc.heads.includes(it)){
+    editor = `<h3>Selected head</h3>
+      <label>Zone<select data-hzone="${it.id}"><option value="">Needs assignment</option>${doc.zones.map(z=>`<option value="${z.id}"${z.id===it.zone?' selected':''}>${esc(zoneLabel(z))}</option>`).join('')}</select></label>
+      <label>Head type<select data-htype="${it.id}">${HEAD_TYPES.map(t=>`<option value="${t}"${t===it.type?' selected':''}>${HEAD_LABEL[t]}</option>`).join('')}</select></label>
+      <button class="danger" data-del="${it.id}">Delete head</button>`;
+  } else if(it){
+    editor = `<p class="muted">${esc(it.code)} is selected. Edit it on the Equipment tab.</p>
+      <button data-switch-tab="equip">Go to Equipment</button>`;
   }
-
-  $('#side').innerHTML = `
-    ${autoNote ? `<p class="warn">${esc(autoNote)}</p>` : ''}
+  return `
     <section>
       <h3>Scale</h3>
-      <p class="muted">${doc.scale ? 'Scale is set. Use Measure to read distances in feet.' : 'Not set. Tap two points a known distance apart, then enter that distance in feet.'}</p>
-      <div class="row">
-        <button data-mode-set="calibrate">Set scale</button>
-        <button data-mode-set="measure" ${doc.scale?'':'disabled'}>Measure</button>
-      </div>
+      <p class="muted">${scaleText()}</p>
     </section>
+    <section>
+      <h3>Active zone</h3>
+      <p class="muted">New heads go to this zone.</p>
+      <select data-activezone>${zoneOpts}</select>
+      <p class="muted">Heads needing assignment: <b>${un}</b></p>
+    </section>
+    <section>${editor}</section>`;
+}
+
+function zonesSide(){
+  const un = doc.heads.filter(h=>!h.zone).length;
+  return `
     <section>
       <h3>Zones</h3>
-      <p class="muted">Tap a zone to make it active. New heads go to the active zone.</p>
-      ${zoneRows || '<p class="muted">No zones yet.</p>'}
+      <p class="muted">Tap a zone to make it active on the Map tab. Names are optional.</p>
+      ${zoneRowsHTML() || '<p class="muted">No zones yet.</p>'}
       <button data-zadd>+ Add zone</button>
-      <p class="muted">Heads needing assignment: <b>${unassigned}</b></p>
     </section>
-    <section>${editor}</section>
+    <section>
+      <h3>Unassigned heads</h3>
+      <p class="muted"><b>${un}</b> head(s) need a zone.</p>
+      <button data-next-unassigned ${un ? '' : 'disabled'}>Find next unassigned head</button>
+    </section>`;
+}
+
+function equipSide(){
+  const rows = doc.equipment.map(q=>`<button class="eqrow${q.id===sel?' on':''}" data-select="${q.id}">${esc(q.code)} · ${esc(q.name)}</button>`).join('')
+    || '<p class="muted">No equipment yet. Choose a type in the toolbar, then tap the map.</p>';
+  let editor = '<p class="muted">Tap an item in the list or on the map to edit it.</p>';
+  const it = sel && findItem(sel);
+  if(it && !doc.heads.includes(it)){
+    editor = `<h3>${esc(KIND[it.kind].name)} · ${esc(it.code)}</h3>
+      <label>Name<input data-ename="${it.id}" value="${esc(it.name)}"></label>
+      <label>Notes<textarea data-enotes="${it.id}" rows="2">${esc(it.notes)}</textarea></label>
+      <button class="danger" data-del="${it.id}">Delete</button>`;
+  } else if(it){
+    editor = `<p class="muted">A sprinkler head is selected. Edit it on the Map tab.</p>
+      <button data-switch-tab="map">Go to Map</button>`;
+  }
+  return `
+    <section>
+      <h3>Equipment</h3>
+      <div class="eqlist">${rows}</div>
+    </section>
+    <section>${editor}</section>`;
+}
+
+function printSide(){
+  return `
     <section>
       <h3>Print</h3>
-      <label class="radio"><input type="radio" name="pm" value="yard" ${printMode==='yard'?'checked':''}> Whole yard only</label>
-      <label class="radio"><input type="radio" name="pm" value="zones" ${printMode==='zones'?'checked':''}> Whole yard + one sheet per zone</label>
+      <label class="radio"><input type="radio" name="pm" value="overview" ${printMode==='overview'?'checked':''}> Overview</label>
+      <label class="radio"><input type="radio" name="pm" value="zones" ${printMode==='zones'?'checked':''}> Overview + zone detail</label>
       <button class="primary" data-print>Print</button>
+    </section>
+    <section>
+      <p class="muted">Each sheet shows the map, zone and equipment lists, the last-updated date, and a disclaimer.</p>
     </section>`;
+}
+
+function renderSide(){
+  const body = {map:mapSide, zones:zonesSide, equip:equipSide, print:printSide}[tab]();
+  $('#side').innerHTML = (autoNote ? `<p class="warn">${esc(autoNote)}</p>` : '') + body;
 }
 
 function hintText(){
   if(flashMsg) return flashMsg;
+  if(tab === 'zones') return 'Tap a zone in the side panel to make it active. Use Find next unassigned head to fix heads that need a zone.';
+  if(tab === 'print') return 'Preview only. Choose print options in the side panel.';
   switch(mode){
     case 'select': return 'Tap an item to edit it. Drag to move it.';
     case 'head': return `Tap the map to add a sprinkler head to ${activeZone ? zoneLabel(zoneById(activeZone)) : 'no zone (needs assignment)'}.`;
@@ -322,15 +434,25 @@ function hintText(){
   }
 }
 function updateHint(){ $('#hint').textContent = hintText(); }
-function renderAll(){ renderMap(); renderSide(); updateHint(); }
+
+function renderAll(){
+  renderTabs(); renderToolbar(); renderMap(); renderSide(); updateHint(); updateUndo();
+}
+
+function setTab(t){
+  tab = t; mode = 'select'; measurePts = []; flashMsg = '';
+  renderAll();
+}
 
 function setMode(m){
-  mode = m; measurePts = []; flashMsg = ''; lastDist = (m==='measure') ? lastDist : null;
+  mode = m; measurePts = []; flashMsg = '';
+  lastDist = (m === 'measure') ? lastDist : null;
   renderAll();
 }
 
 /* ---------- zones & items ---------- */
 function addZone(){
+  checkpoint();
   const used = new Set(doc.zones.map(z=>z.color));
   const color = PALETTE.find(c=>!used.has(c)) || PALETTE[doc.zones.length % PALETTE.length];
   const num = Math.max(0, ...doc.zones.map(z=>z.num)) + 1;
@@ -344,6 +466,7 @@ function deleteZone(id){
   const z = zoneById(id);
   const n = doc.heads.filter(h=>h.zone===id).length;
   if(!confirm(`Delete ${zoneLabel(z)}?${n ? ` Its ${n} head(s) will need assignment.` : ''}`)) return;
+  checkpoint();
   doc.heads.forEach(h=>{ if(h.zone===id) h.zone = null; });
   doc.zones = doc.zones.filter(z=>z.id!==id);
   if(activeZone===id) activeZone = doc.zones[0]?.id ?? null;
@@ -351,6 +474,7 @@ function deleteZone(id){
 }
 
 function addItem(kind, p){
+  checkpoint();
   let it;
   if(kind==='head'){
     it = {id:uid(), x:p.x, y:p.y, zone:activeZone, type:'unknown'};
@@ -371,6 +495,7 @@ function deleteItem(id){
   if(!it) return;
   const label = doc.heads.includes(it) ? 'sprinkler head' : KIND[it.kind].name.toLowerCase();
   if(!confirm(`Delete this ${label}?`)) return;
+  checkpoint();
   doc.heads = doc.heads.filter(h=>h.id!==id);
   doc.equipment = doc.equipment.filter(q=>q.id!==id);
   if(sel===id) sel = null;
@@ -385,6 +510,7 @@ function finishMeasure(){
     const ft = parseFloat(prompt('How many feet is the distance between those two points?'));
     measurePts = [];
     if(ft>0 && px>0){
+      checkpoint();
       doc.scale = {feetPerImgPx: ft/px};
       touch();
       setMode('select');
@@ -428,13 +554,35 @@ function saveFile(){
 function afterLoad(){
   activeZone = doc.zones[0]?.id ?? null;
   sel = null; measurePts = []; lastDist = null; zoom = 1;
-  mode = 'select';
+  tab = 'map'; mode = 'select';
+  undoStack = [];
   if(!doc.image) showSetup();
   renderAll();
 }
 
 /* ---------- printing ---------- */
+function overviewSheetHTML(s, date, img){
+  const unassigned = doc.heads.filter(h=>!h.zone).length;
+  const zoneItems = doc.zones.map(z=>`<div class="row2"><span class="chip" style="background:${z.color}">${z.num}</span><span>${esc(zoneLabel(z))}</span></div>`).join('')
+    + (unassigned ? `<div class="row2"><span class="chip" style="background:#dc2626">?</span><span>Needs assignment (${unassigned} head${unassigned===1?'':'s'})</span></div>` : '');
+  const eqItems = doc.equipment.map(q=>`<div class="row2"><span class="code">${esc(q.code)}</span><span>${esc(KIND[q.kind].name)}${q.name && q.name!==KIND[q.kind].name ? ' – '+esc(q.name) : ''}</span></div>`).join('');
+  return `<section class="sheet">
+    <div class="phead">
+      <div class="ptitle">${esc(doc.name || 'Sprinkler Map')}</div>
+      <div class="psub">${esc(s.title)} · Last updated ${date}</div>
+    </div>
+    <div class="pwrap"><div class="pstage"><img src="${img}" alt=""><div class="layer">${markersHTML(undefined, true)}</div></div></div>
+    <div class="legend">
+      <h4>Zones</h4>
+      ${zoneItems || '<div>No zones</div>'}
+      ${eqItems ? '<h4>Equipment</h4>' + eqItems : ''}
+    </div>
+    <p class="disc">For reference only. Check with a licensed irrigation contractor or qualified professional before sprinkler, plumbing, or winterization work.</p>
+  </section>`;
+}
+
 function sheetHTML(s, date, img){
+  if(s.overview) return overviewSheetHTML(s, date, img);
   const heads = doc.heads.filter(h => s.zone===undefined || h.zone===s.zone);
   const unassigned = doc.heads.filter(h=>!h.zone).length;
   const zoneRows = s.zone===undefined
@@ -456,7 +604,7 @@ function sheetHTML(s, date, img){
 
 function printSheets(){
   if(!doc.image){ flash('Add a map picture first.'); return; }
-  const sheets = [{title:'Whole yard', zone:undefined}];
+  const sheets = [{title:'Overview', zone:undefined, overview:true}];
   if(printMode==='zones') doc.zones.forEach(z=>sheets.push({title:zoneLabel(z), zone:z.id}));
   const date = new Date(doc.updated).toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
   $('#printArea').innerHTML = sheets.map(s=>sheetHTML(s, date, doc.image)).join('');
@@ -483,6 +631,7 @@ $('#splash').addEventListener('click', ()=>{
 });
 
 // header buttons
+$('#bUndo').onclick = undo;
 $('#bNew').onclick = ()=>{
   if(dirty && !confirm('Discard unsaved work?')) return;
   doc = newDoc(); dirty = false; clearAutosave();
@@ -511,13 +660,19 @@ $('#fileOpen').addEventListener('change', e=>{
   r.readAsText(f);
 });
 $('#bSave').onclick = saveFile;
-$('#bPrint').onclick = printSheets;
+$('#bPrint').onclick = ()=>setTab('print');
 $('#bPic').onclick = ()=>showSetup();
-$('#zin').onclick = ()=>{ zoom = Math.min(3, zoom+0.5); renderMap(); };
-$('#zout').onclick = ()=>{ zoom = Math.max(1, zoom-0.5); renderMap(); };
-$('#modes').addEventListener('click', e=>{
+
+// tabs and toolbar
+$('#tabs').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-tab]');
+  if(b) setTab(b.dataset.tab);
+});
+$('#toolbar').addEventListener('click', e=>{
+  const z = e.target.closest('[data-zoom]');
+  if(z){ zoom = Math.min(3, Math.max(1, zoom + 0.5*Number(z.dataset.zoom))); renderMap(); return; }
   const b = e.target.closest('button[data-mode]');
-  if(b) setMode(b.dataset.mode);
+  if(b && !b.disabled) setMode(b.dataset.mode);
 });
 
 // setup / picture
@@ -553,10 +708,10 @@ $('#fileImg').addEventListener('change', e=>{
 // map stage: placing, selecting, dragging
 $('#stage').addEventListener('pointerdown', e=>{
   const mk = e.target.closest('.mk');
-  if(!mk || mode!=='select' || !mk.dataset.id) return;
+  if(!mk || mode!=='select' || tab==='print' || !mk.dataset.id) return;
   e.preventDefault();
   sel = mk.dataset.id;
-  drag = {id:sel, el:mk, moved:false};
+  drag = {id:sel, el:mk, moved:false, snap:snap()};
   try{ mk.setPointerCapture(e.pointerId); }catch(_){}
   renderSide();
 });
@@ -572,16 +727,16 @@ $('#stage').addEventListener('pointermove', e=>{
 });
 function endDrag(){
   if(!drag) return;
-  const moved = drag.moved;
+  const d = drag;
   drag = null;
-  if(moved){ suppressClick = true; touch(); }
+  if(d.moved){ checkpoint(d.snap); suppressClick = true; touch(); }
   renderAll();
 }
 $('#stage').addEventListener('pointerup', endDrag);
 $('#stage').addEventListener('pointercancel', endDrag);
 
 $('#stage').addEventListener('click', e=>{
-  if(!doc.image) return;
+  if(!doc.image || tab==='print') return;
   if(suppressClick){ suppressClick = false; return; }
   if(e.target.closest('.mk')) return;
   const p = pt(e);
@@ -599,33 +754,64 @@ $('#stage').addEventListener('click', e=>{
 // side panel
 $('#side').addEventListener('click', e=>{
   const t = e.target;
-  const ms = t.closest('[data-mode-set]');
-  if(ms){ if(!ms.disabled) setMode(ms.dataset.modeSet); return; }
   if(t.closest('[data-zadd]')){ addZone(); return; }
   const zd = t.closest('[data-zdel]');
   if(zd){ deleteZone(zd.dataset.zdel); return; }
   const del = t.closest('[data-del]');
   if(del){ deleteItem(del.dataset.del); return; }
   if(t.closest('[data-print]')){ printSheets(); return; }
+  const sw = t.closest('[data-switch-tab]');
+  if(sw){ setTab(sw.dataset.switchTab); return; }
+  const sel2 = t.closest('[data-select]');
+  if(sel2){ sel = sel2.dataset.select; renderAll(); return; }
+  if(t.closest('[data-next-unassigned]')){
+    const h = doc.heads.find(h=>!h.zone);
+    if(h){ sel = h.id; setTab('map'); flash('Choose a zone for this head in the side panel.'); }
+    return;
+  }
   const row = t.closest('[data-zrow]');
   if(row && !t.closest('input,button')){
     activeZone = row.dataset.zrow;
-    renderSide(); updateHint();
+    renderAll();
   }
 });
+$('#side').addEventListener('focusin', e=>{
+  if(e.target.matches('input[type=text],input:not([type]),textarea')) textSnap = snap();
+});
+$('#side').addEventListener('focusout', ()=>{ textSnap = null; });
+function textEdit(fn){
+  if(textSnap){ checkpoint(textSnap); textSnap = null; }
+  fn();
+  touch();
+}
 $('#side').addEventListener('input', e=>{
   const t = e.target;
-  if(t.dataset.zname){ const z = zoneById(t.dataset.zname); if(z) z.name = t.value; }
-  else if(t.dataset.ename){ const it = findItem(t.dataset.ename); if(it) it.name = t.value; }
-  else if(t.dataset.enotes){ const it = findItem(t.dataset.enotes); if(it) it.notes = t.value; }
-  else return;
-  touch();
+  if(t.dataset.zname) return textEdit(()=>{ const z = zoneById(t.dataset.zname); if(z) z.name = t.value; });
+  if(t.dataset.ename) return textEdit(()=>{ const it = findItem(t.dataset.ename); if(it) it.name = t.value; });
+  if(t.dataset.enotes) return textEdit(()=>{ const it = findItem(t.dataset.enotes); if(it) it.notes = t.value; });
 });
 $('#side').addEventListener('change', e=>{
   const t = e.target;
-  if(t.dataset.hzone){ const h = findItem(t.dataset.hzone); if(h){ h.zone = t.value || null; touch(); renderAll(); } }
-  else if(t.dataset.htype){ const h = findItem(t.dataset.htype); if(h){ h.type = t.value; touch(); } }
-  else if(t.name==='pm'){ printMode = t.value; }
+  if(t.dataset.activezone !== undefined){ activeZone = t.value || null; updateHint(); return; }
+  if(t.dataset.hzone){
+    const h = findItem(t.dataset.hzone);
+    if(h){ checkpoint(); h.zone = t.value || null; touch(); renderAll(); }
+    return;
+  }
+  if(t.dataset.htype){
+    const h = findItem(t.dataset.htype);
+    if(h){ checkpoint(); h.type = t.value; touch(); }
+    return;
+  }
+  if(t.name==='pm'){ printMode = t.value; }
+});
+
+// keyboard undo (Cmd/Ctrl+Z) outside text fields
+document.addEventListener('keydown', e=>{
+  if((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase()==='z' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){
+    e.preventDefault();
+    undo();
+  }
 });
 
 // block pull-down-to-refresh at the top of the page so unsaved work isn't lost
@@ -634,7 +820,8 @@ document.addEventListener('touchstart', e=>{ touchStartY = e.touches[0].clientY;
 document.addEventListener('touchmove', e=>{
   const dy = e.touches[0].clientY - touchStartY;
   const sw = $('#stageWrap');
-  const scrollingMap = sw && sw.contains(e.target) && sw.scrollTop > 0;
+  const sd = $('#side');
+  const scrollingMap = (sw && sw.contains(e.target) && sw.scrollTop > 0) || (sd.contains(e.target) && sd.scrollTop > 0);
   if(window.scrollY <= 0 && dy > 0 && !scrollingMap) e.preventDefault();
 }, {passive:false});
 
@@ -705,6 +892,8 @@ function applyCrop(useCrop){
 $('#cropFull').onclick = ()=>applyCrop(false);
 $('#cropUse').onclick = ()=>applyCrop(true);
 $('#cropBack').onclick = ()=>{ $('#crop').hidden = true; $('#setup').hidden = false; };
+
+window.addEventListener('resize', ()=>renderMap());
 
 // boot
 doc = newDoc();
